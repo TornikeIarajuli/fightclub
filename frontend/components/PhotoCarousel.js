@@ -30,7 +30,7 @@ export default function PhotoCarousel({ userId, photos = [] }) {
       <img
         src={photos[currentIndex].photo_url.startsWith('http')
           ? photos[currentIndex].photo_url
-          : `http://localhost:8000${photos[currentIndex].photo_url}`}
+          : `https://fightmatch-backend.onrender.com${photos[currentIndex].photo_url}`}
         alt="Profile"
         className="w-full h-full object-cover transition-opacity duration-300"
       />

@@ -37,7 +37,7 @@ export default function PhotoUpload({ currentPhotoUrl, onPhotoUpdated }) {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('http://localhost:8000/users/me/photo', {
+      const response = await fetch('https://fightmatch-backend.onrender.com/users/me/photo', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -67,7 +67,7 @@ export default function PhotoUpload({ currentPhotoUrl, onPhotoUpdated }) {
 
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch('http://localhost:8000/users/me/photo', {
+      const response = await fetch('https://fightmatch-backend.onrender.com/users/me/photo', {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -94,7 +94,7 @@ export default function PhotoUpload({ currentPhotoUrl, onPhotoUpdated }) {
         <div className="w-32 h-32 rounded-2xl overflow-hidden bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center">
           {preview ? (
             <img
-              src={preview.startsWith('http') ? preview : `http://localhost:8000${preview}`}
+              src={preview.startsWith('http') ? preview : `https://fightmatch-backend.onrender.com${preview}`}
               alt="Profile"
               className="w-full h-full object-cover"
             />

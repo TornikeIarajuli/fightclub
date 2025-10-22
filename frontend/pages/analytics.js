@@ -23,7 +23,7 @@ export default function Analytics() {
   const fetchAnalytics = async () => {
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch('http://localhost:8000/analytics', {
+      const response = await fetch('https://fightmatch-backend.onrender.com/analytics', {
         headers: {
           'Authorization': `Bearer ${token}`
         }

@@ -74,8 +74,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://fightmatch.onrender.com",  # Your frontend will be here
-        "https://*.onrender.com"  # Allow any Render subdomain
+        "https://fightmatch.onrender.com",
+        "https://fightmatch-45bf4.web.app",  # Add this - your Firebase URL
+        "https://fightmatch-45bf4.firebaseapp.com",  # Add this too
     ],
     allow_credentials=True,
     allow_methods=["*"],

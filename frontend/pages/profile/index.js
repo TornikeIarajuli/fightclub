@@ -23,7 +23,7 @@ export default function Profile() {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/users/me', {
+      const response = await fetch('https://fightmatch-backend.onrender.com/users/me', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -58,7 +58,7 @@ export default function Profile() {
 
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch('http://localhost:8000/users/me/photo', {
+      const response = await fetch('https://fightmatch-backend.onrender.com/users/me/photo', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -144,7 +144,7 @@ export default function Profile() {
                         <img
                           src={user.profile_pic.startsWith('http')
                             ? user.profile_pic
-                            : `http://localhost:8000${user.profile_pic}`}
+                            : `https://fightmatch-backend.onrender.com${user.profile_pic}`}
                           alt="Profile"
                           className="w-full h-full object-cover"
                         />

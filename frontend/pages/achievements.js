@@ -22,7 +22,7 @@ export default function Achievements() {
   const fetchUserStats = async () => {
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch('http://localhost:8000/profile/stats', {
+      const response = await fetch('https://fightmatch-backend.onrender.com/profile/stats', {
         headers: {
           'Authorization': `Bearer ${token}`
         }

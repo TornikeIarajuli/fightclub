@@ -15,8 +15,8 @@ export default function PhotoGalleryManager({ userId, isOwner = false }) {
     try {
       const token = localStorage.getItem('access_token');
       const endpoint = isOwner
-        ? 'http://localhost:8000/users/me/gallery'
-        : `http://localhost:8000/users/${userId}/gallery`;
+        ? https://fightmatch-backend.onrender.com/users/me/gallery'
+        : https://fightmatch-backend.onrender.com/users/${userId}/gallery`;
 
       const response = await fetch(endpoint, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -51,7 +51,7 @@ export default function PhotoGalleryManager({ userId, isOwner = false }) {
 
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch(`http://localhost:8000/users/me/gallery?is_primary=${isPrimary}`, {
+      const response = await fetch(`https://fightmatch-backend.onrender.com/users/me/gallery?is_primary=${isPrimary}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -76,7 +76,7 @@ export default function PhotoGalleryManager({ userId, isOwner = false }) {
 
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch(`http://localhost:8000/users/me/gallery/${photoId}`, {
+      const response = await fetch(`https://fightmatch-backend.onrender.com/users/me/gallery/${photoId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -93,7 +93,7 @@ export default function PhotoGalleryManager({ userId, isOwner = false }) {
   const handleSetPrimary = async (photoId) => {
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch(`http://localhost:8000/users/me/gallery/${photoId}/primary`, {
+      const response = await fetch(`https://fightmatch-backend.onrender.com/users/me/gallery/${photoId}/primary`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -126,7 +126,7 @@ export default function PhotoGalleryManager({ userId, isOwner = false }) {
             <img
               src={photo.photo_url.startsWith('http')
                 ? photo.photo_url
-                : `http://localhost:8000${photo.photo_url}`}
+                : `https://fightmatch-backend.onrender.com${photo.photo_url}`}
               alt="Gallery"
               className="w-full h-full object-cover"
             />

@@ -22,7 +22,7 @@ export default function Login() {
       formBody.append('username', formData.username);
       formBody.append('password', formData.password);
 
-      const response = await fetch('http://localhost:8000/token', {
+      const response = await fetch('https://fightmatch-backend.onrender.com/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -38,7 +38,7 @@ export default function Login() {
         
         // ✅ NEW: Fetch user data and store user_id
         try {
-          const userResponse = await fetch('http://localhost:8000/users/me', {
+          const userResponse = await fetch('https://fightmatch-backend.onrender.com/users/me', {
             headers: {
               'Authorization': `Bearer ${data.access_token}`
             }

@@ -17,8 +17,8 @@
    ```bash
    python main.py
    ```
-   The API will be available at http://localhost:8000
-   API docs at http://localhost:8000/docs
+   The API will be available at https://fightmatch-backend.onrender.com
+   API docs at https://fightmatch-backend.onrender.com/docs
 
 ## Frontend Setup (Next.js)
 

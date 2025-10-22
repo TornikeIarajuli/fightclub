@@ -34,7 +34,7 @@ export default function Matches() {
   const fetchMatches = async () => {
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch('http://localhost:8000/matches', {
+      const response = await fetch('https://fightmatch-backend.onrender.com/matches', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -64,7 +64,7 @@ export default function Matches() {
 
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch('http://localhost:8000/fights/record', {
+      const response = await fetch('https://fightmatch-backend.onrender.com/fights/record', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -137,7 +137,7 @@ export default function Matches() {
                       <img
                         src={match.profile_pic.startsWith('http')
                           ? match.profile_pic
-                          : `http://localhost:8000${match.profile_pic}`}
+                          : `https://fightmatch-backend.onrender.com${match.profile_pic}`}
                         alt={match.username}
                         className="w-full h-full object-cover"
                       />

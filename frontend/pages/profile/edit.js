@@ -39,7 +39,7 @@ export default function EditProfile() {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/users/me', {
+      const response = await fetch('https://fightmatch-backend.onrender.com/users/me', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -125,7 +125,7 @@ export default function EditProfile() {
     const token = localStorage.getItem('access_token');
 
     try {
-      const response = await fetch('http://localhost:8000/users/me', {
+      const response = await fetch('https://fightmatch-backend.onrender.com/users/me', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

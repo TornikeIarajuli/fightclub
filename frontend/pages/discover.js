@@ -38,7 +38,7 @@ export default function Discover() {
 
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch(`http://localhost:8000/users/${userId}/gallery`, {
+      const response = await fetch(`https://fightmatch-backend.onrender.com/users/${userId}/gallery`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -68,8 +68,8 @@ export default function Discover() {
                             );
 
     const url = hasActiveFilters
-      ? 'http://localhost:8000/users/discover/filter'
-      : 'http://localhost:8000/users/discover';
+      ? 'https://fightmatch-backend.onrender.com/users/discover/filter'
+      : 'https://fightmatch-backend.onrender.com/users/discover';
 
     const options = {
       method: hasActiveFilters ? 'POST' : 'GET',
@@ -113,7 +113,7 @@ useEffect(() => {
 
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch('http://localhost:8000/swipe', {
+      const response = await fetch('https://fightmatch-backend.onrender.com/swipe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -43,7 +43,7 @@ export default function MessageThread() {
   const fetchCurrentUser = async () => {
     const token = localStorage.getItem('access_token');
     try {
-      const response = await fetch('http://localhost:8000/users/me', {
+      const response = await fetch('https://fightmatch-backend.onrender.com/users/me', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -57,7 +57,7 @@ export default function MessageThread() {
     const token = localStorage.getItem('access_token');
     try {
       // Changed from /stats/${userId} to /users/${userId}
-      const response = await fetch(`http://localhost:8000/users/${userId}`, {
+      const response = await fetch('https://fightmatch-backend.onrender.com/users/${userId}', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -144,7 +144,7 @@ export default function MessageThread() {
                     <img
                       src={otherUser.profile_pic.startsWith('http')
                         ? otherUser.profile_pic
-                        : `http://localhost:8000${otherUser.profile_pic}`}
+                        : `https://fightmatch-backend.onrender.com${otherUser.profile_pic}`}
                       alt={otherUser.username}
                       className="w-full h-full object-cover"
                     />

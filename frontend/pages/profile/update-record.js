@@ -31,7 +31,7 @@ export default function UpdateRecord() {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/users/me', {
+      const response = await fetch('https://fightmatch-backend.onrender.com/users/me', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -91,7 +91,7 @@ export default function UpdateRecord() {
     const token = localStorage.getItem('access_token');
 
     try {
-      const response = await fetch('http://localhost:8000/users/me/record', {
+      const response = await fetch('https://fightmatch-backend.onrender.com/users/me/record', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

@@ -65,7 +65,7 @@ export default function Settings() {
     setLoading(true);
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch('http://localhost:8000/users/me/location', {
+      const response = await fetch('https://fightmatch-backend.onrender.com/users/me/location', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -116,7 +116,7 @@ export default function Settings() {
     setLoading(true);
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch('http://localhost:8000/users/me/availability', {
+      const response = await fetch('https://fightmatch-backend.onrender.com/users/me/availability', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

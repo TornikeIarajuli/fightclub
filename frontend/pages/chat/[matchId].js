@@ -28,7 +28,7 @@ export default function Messages() {
     const fetchOtherUser = async () => {
       try {
         const token = localStorage.getItem('access_token');
-        const response = await fetch(`http://localhost:8000/users/${matchId}`, {
+        const response = await fetch(`https://fightmatch-backend.onrender.com/users/${matchId}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -50,7 +50,7 @@ export default function Messages() {
   useEffect(() => {
     if (!matchId) return;
 
-    const currentUserId = parseInt(localStorage.getItem('user_id'));
+    const currentUserId = typeof window !== 'undefined' ? parseInt(localStorage.getItem('user_id')) : null;
     if (!currentUserId) {
       console.error('No user_id in localStorage');
       return;
@@ -90,7 +90,7 @@ export default function Messages() {
     setLoading(true);
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch('http://localhost:8000/messages/send', {
+      const response = await fetch('https://fightmatch-backend.onrender.com/messages/send', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -123,7 +123,7 @@ export default function Messages() {
     }
   };
 
-  const currentUserId = parseInt(localStorage.getItem('user_id'));
+  const currentUserId = typeof window !== 'undefined' ? parseInt(localStorage.getItem('user_id')) : null;
 
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col">

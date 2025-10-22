@@ -1,9 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { getAnalytics } from "firebase/analytics";
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBh5ET8InC-485lsXIwoeyMOpNlwHMTEB0",
   authDomain: "fightmatch-45bf4.firebaseapp.com",
@@ -16,8 +14,7 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
 
-// ✅ EXPORT THESE (they were missing!)
+// Export only what we need (no analytics)
 export const db = getFirestore(app);
 export const storage = getStorage(app);
