@@ -75,7 +75,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "https://fightmatch.onrender.com",
-        "https://fightmatch-45bf4.web.app",  # Add this - your Firebase URL
+        "https://fightmatch-45bf4.web.app",
         "https://fightmatch-45bf4.firebaseapp.com",
         "https://fightmatch-backend.onrender.com",
     ],
@@ -287,7 +287,8 @@ class TokenData(BaseModel):
     username: Optional[str] = None
 
 
-# Create tables
+# Create tables TODO
+Base.metadata.drop_all(bind=engine)
 Base.metadata.create_all(bind=engine)
 
 
