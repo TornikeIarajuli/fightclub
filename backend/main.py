@@ -28,10 +28,21 @@ from firebase_admin import credentials, firestore, storage
 import uuid
 
 
-cred = credentials.Certificate("serviceAccountKey.json")
-cred = credentials.Certificate("serviceAccountKey.json")
+import os
+import json
+
+# Initialize Firebase
+# Check if running in production (environment variable exists)
+if os.getenv('FIREBASE_CREDENTIALS'):
+    # Production: Load from environment variable
+    firebase_creds = json.loads(os.getenv('FIREBASE_CREDENTIALS'))
+    cred = credentials.Certificate(firebase_creds)
+else:
+    # Local development: Load from file
+    cred = credentials.Certificate("serviceAccountKey.json")
+
 firebase_admin.initialize_app(cred, {
-    'storageBucket': 'fightmatch-45bf4.firebasestorage.app'  # Replace with your Firebase project ID
+    'storageBucket': 'fightmatch-45bf4.firebasestorage.app'
 })
 
 firebase_db = firestore.client()
