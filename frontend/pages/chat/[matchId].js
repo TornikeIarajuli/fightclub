@@ -22,29 +22,66 @@ export default function Messages() {
   }, [messages]);
 
   // Fetch other user info
-  useEffect(() => {
-    if (!matchId) return;
+  // Real-time listener for messages
+useEffect(() => {
+  console.log('🔥 Listener useEffect triggered');
+  console.log('matchId:', matchId);
 
-    const fetchOtherUser = async () => {
-      try {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch(`https://fightmatch-backend.onrender.com/users/${matchId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+  if (!matchId) {
+    console.log('❌ No matchId, exiting');
+    return;
+  }
+
+  const currentUserId = typeof window !== 'undefined' ? parseInt(localStorage.getItem('user_id')) : null;
+  console.log('currentUserId:', currentUserId);
+
+  if (!currentUserId) {
+    console.error('❌ No user_id in localStorage');
+    return;
+  }
+
+  // Create conversation ID (same logic as backend)
+  const conversationId = `chat_${Math.min(currentUserId, parseInt(matchId))}_${Math.max(currentUserId, parseInt(matchId))}`;
+  console.log('📝 Conversation ID:', conversationId);
+  console.log('🔥 Firebase db object:', db);
+
+  try {
+    // Set up real-time listener
+    const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+    console.log('📚 Messages ref created:', messagesRef);
+
+    const q = query(messagesRef, orderBy('timestamp', 'asc'));
+    console.log('🔍 Query created');
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      console.log('✅ Snapshot received! Size:', snapshot.size);
+      const msgs = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        console.log('📄 Message doc:', doc.id, data);
+        msgs.push({
+          id: doc.id,
+          ...data,
+          timestamp: data.timestamp?.toDate()
         });
+      });
+      console.log('💬 Total messages:', msgs.length);
+      setMessages(msgs);
+    }, (error) => {
+      console.error('❌ Error listening to messages:', error);
+    });
 
-        if (response.ok) {
-          const data = await response.json();
-          setOtherUser(data);
-        }
-      } catch (error) {
-        console.error('Error fetching user:', error);
-      }
+    console.log('✅ Listener set up successfully');
+
+    // Cleanup listener on unmount
+    return () => {
+      console.log('🧹 Cleaning up listener');
+      unsubscribe();
     };
-
-    fetchOtherUser();
-  }, [matchId]);
+  } catch (error) {
+    console.error('❌ Error setting up listener:', error);
+  }
+}, [matchId]);
 
   // Real-time listener for messages
   useEffect(() => {

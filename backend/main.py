@@ -122,6 +122,7 @@ class User(Base):
     longitude = Column(Float, nullable=True)
     # availability is stored as JSON: {"monday": ["09:00-12:00", "18:00-21:00"], "tuesday": [...]}
     availability = Column(JSON, nullable=True)
+    last_viewed_matches = Column(DateTime, nullable=True)
 
     # Matching preferences
     preferred_distance = Column(Integer, default=50)  # km
@@ -2020,6 +2021,37 @@ async def set_primary_photo(
     db.commit()
 
     return {"message": "Primary photo updated successfully"}
+
+
+@app.get("/matches/unread")
+async def get_unread_matches(
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """Get count of matches since last viewed"""
+
+    if not current_user.last_viewed_matches:
+        # Never viewed, count all matches
+        return {"count": len(current_user.matches)}
+
+    # Count matches created after last view
+    recent_matches = db.query(matches_table).filter(
+        matches_table.c.user_id == current_user.id,
+        matches_table.c.created_at > current_user.last_viewed_matches
+    ).count()
+
+    return {"count": recent_matches}
+
+
+@app.post("/matches/mark-read")
+async def mark_matches_read(
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """Mark all matches as viewed"""
+    current_user.last_viewed_matches = datetime.utcnow()
+    db.commit()
+    return {"status": "success"}
 
 if __name__ == "__main__":
     import uvicorn

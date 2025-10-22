@@ -15,8 +15,8 @@ export default function PhotoGalleryManager({ userId, isOwner = false }) {
     try {
       const token = localStorage.getItem('access_token');
       const endpoint = isOwner
-        ? https://fightmatch-backend.onrender.com/users/me/gallery'
-        : https://fightmatch-backend.onrender.com/users/${userId}/gallery`;
+        ? 'https://fightmatch-backend.onrender.com/users/me/gallery'
+        : `https://fightmatch-backend.onrender.com/users/${userId}/gallery`;
 
       const response = await fetch(endpoint, {
         headers: { 'Authorization': `Bearer ${token}` }

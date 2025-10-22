@@ -5,6 +5,7 @@ import Navigation from '../components/Navigation';
 import DiscoverFilters from '../components/DiscoverFilters';
 import PhotoCarousel from '../components/PhotoCarousel';
 import { Heart, X, Filter, MapPin, Award, User as UserIcon } from 'lucide-react';
+import { useNotifications } from '../context/NotificationContext';
 
 export default function Discover() {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function Discover() {
   const [showFilters, setShowFilters] = useState(false);
   const [activeFilters, setActiveFilters] = useState({});
   const [filterCount, setFilterCount] = useState(0);
+  const { fetchUnreadMatches } = useNotifications();
   const [userGalleries, setUserGalleries] = useState({}); // Store galleries for each user
 
   useEffect(() => {
@@ -107,37 +109,40 @@ useEffect(() => {
 }, []);
 
   const handleSwipe = async (isLike) => {
-    if (currentIndex >= users.length) return;
+  if (currentIndex >= users.length) return;
 
-    const currentUser = users[currentIndex];
+  const currentUser = users[currentIndex];
 
-    try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch('https://fightmatch-backend.onrender.com/swipe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          target_user_id: currentUser.id,
-          is_like: isLike
-        })
-      });
+  try {
+    const token = localStorage.getItem('access_token');
+    const response = await fetch('https://fightmatch-backend.onrender.com/swipe', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        target_user_id: currentUser.id,
+        is_like: isLike
+      })
+    });
 
-      if (response.ok) {
-        const data = await response.json();
+    if (response.ok) {
+      const data = await response.json();
 
-        if (data.match) {
-          alert(`It's a match! You can now message ${currentUser.username}`);
-        }
+      if (data.match) {
+        alert(`It's a match! You can now message ${currentUser.username}`);
 
-        setCurrentIndex(prev => prev + 1);
+        // ✅ Trigger navigation to refresh match count
+        window.dispatchEvent(new CustomEvent('newMatch'));
       }
-    } catch (error) {
-      console.error('Error swiping:', error);
+
+      setCurrentIndex(prev => prev + 1);
     }
-  };
+  } catch (error) {
+    console.error('Error swiping:', error);
+  }
+};
 
   const handleApplyFilters = (filters) => {
     setActiveFilters(filters);

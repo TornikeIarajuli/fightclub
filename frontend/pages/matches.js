@@ -3,12 +3,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Navigation from '../components/Navigation';
 import { MessageSquare, Trophy, Target, Calendar } from 'lucide-react';
+import { useNotifications } from '../context/NotificationContext';
 
 export default function Matches() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [matches, setMatches] = useState([]);
   const [selectedMatch, setSelectedMatch] = useState(null);
+  const { markMatchesAsRead } = useNotifications();
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [recordData, setRecordData] = useState({
     result: 'win',
@@ -20,6 +22,26 @@ export default function Matches() {
     'BJJ', 'Muay Thai', 'Boxing', 'Wrestling', 'Judo',
     'Karate', 'Taekwondo', 'Kickboxing', 'MMA', 'Sambo'
   ];
+
+  useEffect(() => {
+    markMatchesAsRead();
+
+    const markRead = async () => {
+      try {
+        const token = localStorage.getItem('access_token');
+        await fetch('https://fightmatch-backend.onrender.com/matches/mark-read', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+      } catch (error) {
+        console.error('Error marking matches as read:', error);
+      }
+    };
+
+    markRead();
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
