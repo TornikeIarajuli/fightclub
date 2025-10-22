@@ -76,7 +76,8 @@ app.add_middleware(
         "http://localhost:3000",
         "https://fightmatch.onrender.com",
         "https://fightmatch-45bf4.web.app",  # Add this - your Firebase URL
-        "https://fightmatch-45bf4.firebaseapp.com",  # Add this too
+        "https://fightmatch-45bf4.firebaseapp.com",
+        "https://fightmatch-backend.onrender.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
