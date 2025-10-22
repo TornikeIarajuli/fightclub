@@ -61,7 +61,11 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://fightmatch.onrender.com",  # Your frontend will be here
+        "https://*.onrender.com"  # Allow any Render subdomain
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
