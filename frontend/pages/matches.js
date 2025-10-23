@@ -2,8 +2,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Navigation from '../components/Navigation';
-import { MessageSquare, Trophy, Target, Calendar } from 'lucide-react';
+import { MessageSquare, Trophy, Target, Bell } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
+import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { db } from '../src/firebase';
 
 export default function Matches() {
   const router = useRouter();
@@ -12,6 +14,8 @@ export default function Matches() {
   const [selectedMatch, setSelectedMatch] = useState(null);
   const { markMatchesAsRead } = useNotifications();
   const [showRecordModal, setShowRecordModal] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState({});
+  const [lastMessages, setLastMessages] = useState({});
   const [recordData, setRecordData] = useState({
     result: 'win',
     martialArtStyle: '',
@@ -65,11 +69,72 @@ export default function Matches() {
       if (response.ok) {
         const data = await response.json();
         setMatches(data);
+
+        // Set up real-time listeners for each match
+        data.forEach(match => {
+          setupMessageListener(match.id);
+        });
       }
     } catch (error) {
       console.error('Error fetching matches:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const setupMessageListener = async (matchId) => {
+    try {
+      const token = localStorage.getItem('access_token');
+
+      // Get current user ID
+      const userResponse = await fetch('https://fightmatch-backend.onrender.com/users/me', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!userResponse.ok) return;
+
+      const currentUser = await userResponse.json();
+      const currentUserId = currentUser.id;
+
+      // Create conversation ID
+      const conversationId = `chat_${Math.min(currentUserId, matchId)}_${Math.max(currentUserId, matchId)}`;
+
+      // Listen to messages in this conversation
+      const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+      const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(1));
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        let unreadCount = 0;
+        let lastMsg = null;
+
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          lastMsg = {
+            content: data.content,
+            timestamp: data.timestamp?.toDate(),
+            sender_id: data.sender_id
+          };
+
+          // Count unread messages (messages not sent by current user)
+          if (data.sender_id !== currentUserId && !data.read) {
+            unreadCount++;
+          }
+        });
+
+        setUnreadMessages(prev => ({
+          ...prev,
+          [matchId]: unreadCount
+        }));
+
+        setLastMessages(prev => ({
+          ...prev,
+          [matchId]: lastMsg
+        }));
+      });
+
+      return unsubscribe;
+    } catch (error) {
+      console.error('Error setting up message listener:', error);
     }
   };
 
@@ -114,6 +179,23 @@ export default function Matches() {
     }
   };
 
+  const formatLastMessageTime = (timestamp) => {
+    if (!timestamp) return '';
+
+    const now = new Date();
+    const diff = now - timestamp;
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (seconds < 60) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    return timestamp.toLocaleDateString();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900">
@@ -147,82 +229,128 @@ export default function Matches() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {matches.map((match) => (
-              <div
-                key={match.id}
-                className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 border border-red-500/20 hover:border-red-500/50 transition-all duration-300 shadow-lg"
-              >
-                {/* Match Info */}
-                <div className="flex items-center space-x-4 mb-4">
-                  <div className="w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-white text-2xl font-bold flex-shrink-0">
-                    {match.profile_pic ? (
-                      <img
-                        src={match.profile_pic.startsWith('http')
-                          ? match.profile_pic
-                          : `https://fightmatch-backend.onrender.com${match.profile_pic}`}
-                        alt={match.username}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      match.username.charAt(0).toUpperCase()
-                    )}
+            {matches.map((match) => {
+              const hasUnread = unreadMessages[match.id] > 0;
+              const lastMsg = lastMessages[match.id];
+
+              return (
+                <div
+                  key={match.id}
+                  className={`bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 border transition-all duration-300 shadow-lg relative ${
+                    hasUnread
+                      ? 'border-red-500/50 shadow-red-500/20 ring-2 ring-red-500/30'
+                      : 'border-red-500/20 hover:border-red-500/50'
+                  }`}
+                >
+                  {/* Unread Badge */}
+                  {hasUnread && (
+                    <div className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 animate-pulse shadow-lg">
+                      <Bell size={12} />
+                      {unreadMessages[match.id]} new
+                    </div>
+                  )}
+
+                  {/* Match Info */}
+                  <div className="flex items-center space-x-4 mb-4">
+                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-white text-2xl font-bold flex-shrink-0 relative">
+                      {match.profile_pic ? (
+                        <img
+                          src={match.profile_pic.startsWith('http')
+                            ? match.profile_pic
+                            : `https://fightmatch-backend.onrender.com${match.profile_pic}`}
+                          alt={match.username}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        match.username.charAt(0).toUpperCase()
+                      )}
+                      {hasUnread && (
+                        <div className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-gray-900 animate-pulse"></div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-white">{match.username}</h3>
+                      <p className="text-gray-400 text-sm">{match.skill_level || 'Intermediate'}</p>
+
+                      {/* Last Message Preview */}
+                      {lastMsg && (
+                        <div className="mt-1">
+                          <p className={`text-sm truncate ${hasUnread ? 'text-white font-semibold' : 'text-gray-500'}`}>
+                            {lastMsg.content}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-0.5">
+                            {formatLastMessageTime(lastMsg.timestamp)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold text-white">{match.username}</h3>
-                    <p className="text-gray-400 text-sm">{match.skill_level || 'Intermediate'}</p>
+
+                  {/* Stats */}
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    <div className="bg-gray-900/50 rounded-lg p-2 text-center">
+                      <p className="text-green-500 font-bold text-lg">{match.wins || 0}</p>
+                      <p className="text-gray-500 text-xs">Wins</p>
+                    </div>
+                    <div className="bg-gray-900/50 rounded-lg p-2 text-center">
+                      <p className="text-red-500 font-bold text-lg">{match.losses || 0}</p>
+                      <p className="text-gray-500 text-xs">Losses</p>
+                    </div>
+                    <div className="bg-gray-900/50 rounded-lg p-2 text-center">
+                      <p className="text-yellow-500 font-bold text-lg">{match.draws || 0}</p>
+                      <p className="text-gray-500 text-xs">Draws</p>
+                    </div>
+                  </div>
+
+                  {/* Martial Arts */}
+                  <div className="mb-4">
+                    <div className="flex flex-wrap gap-2">
+                      {match.martial_arts && match.martial_arts.slice(0, 3).map((style, index) => (
+                        <span
+                          key={index}
+                          className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-sm font-semibold"
+                        >
+                          {style}
+                        </span>
+                      ))}
+                      {match.martial_arts && match.martial_arts.length > 3 && (
+                        <span className="px-3 py-1 bg-gray-700 text-gray-400 rounded-lg text-sm font-semibold">
+                          +{match.martial_arts.length - 3} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => router.push(`/chat/${match.id}`)}
+                      className={`flex-1 flex items-center justify-center gap-2 font-semibold py-3 rounded-lg transition-all relative ${
+                        hasUnread
+                          ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/30'
+                          : 'bg-gray-700 hover:bg-gray-600 text-white'
+                      }`}
+                    >
+                      <MessageSquare size={18} />
+                      Message
+                      {hasUnread && (
+                        <span className="absolute -top-1 -right-1 bg-yellow-500 text-gray-900 text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                          {unreadMessages[match.id]}
+                        </span>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => handleRecordFight(match)}
+                      className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white font-semibold py-3 rounded-lg transition shadow-lg shadow-green-500/20"
+                    >
+                      <Trophy size={18} />
+                      Record Fight
+                    </button>
                   </div>
                 </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-2 mb-4">
-                  <div className="bg-gray-900/50 rounded-lg p-2 text-center">
-                    <p className="text-green-500 font-bold text-lg">{match.wins || 0}</p>
-                    <p className="text-gray-500 text-xs">Wins</p>
-                  </div>
-                  <div className="bg-gray-900/50 rounded-lg p-2 text-center">
-                    <p className="text-red-500 font-bold text-lg">{match.losses || 0}</p>
-                    <p className="text-gray-500 text-xs">Losses</p>
-                  </div>
-                  <div className="bg-gray-900/50 rounded-lg p-2 text-center">
-                    <p className="text-yellow-500 font-bold text-lg">{match.draws || 0}</p>
-                    <p className="text-gray-500 text-xs">Draws</p>
-                  </div>
-                </div>
-
-                {/* Martial Arts */}
-                <div className="mb-4">
-                  <div className="flex flex-wrap gap-2">
-                    {match.martial_arts && match.martial_arts.map((style, index) => (
-                      <span
-                        key={index}
-                        className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-sm font-semibold"
-                      >
-                        {style}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => router.push(`/chat/${match.id}`)}
-                    className="flex-1 flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 rounded-lg transition"
-                  >
-                    <MessageSquare size={18} />
-                    Message
-                  </button>
-
-                  <button
-                    onClick={() => handleRecordFight(match)}
-                    className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg transition shadow-lg shadow-red-500/30"
-                  >
-                    <Trophy size={18} />
-                    Record Fight
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
