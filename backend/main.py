@@ -1,23 +1,17 @@
 # main.py
-from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, ForeignKey, Table, DateTime, JSON
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
-from pydantic import BaseModel, EmailStr
-from typing import List, Optional
-from datetime import datetime, timedelta
+from typing import List
 from passlib.context import CryptContext
 import jwt
 from jwt import PyJWTError
-import json
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, ForeignKey, Table, DateTime, Text
 from pydantic import BaseModel, EmailStr, ConfigDict
 from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File
 from fastapi.staticfiles import StaticFiles
-import shutil
-import os
 from pathlib import Path
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, JSON
 from datetime import datetime, timedelta
@@ -26,6 +20,7 @@ from sqlalchemy import func, Boolean
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
 import uuid
+from sqlalchemy.orm import Session
 
 
 import os
@@ -1722,39 +1717,57 @@ class MessageCreate(BaseModel):
 
 @app.post("/messages/send")
 async def send_message(
-        message_data: MessageCreate,
+        message: MessageCreate,
         current_user: User = Depends(get_current_user),
         db: Session = Depends(get_db)
 ):
-    """Send a real-time message via Firebase"""
+    """Send a message to a matched user"""
+    # Verify the match exists
+    match = db.query(Match).filter(
+        or_(
+            and_(Match.user_id == current_user.id, Match.matched_user_id == message.match_id),
+            and_(Match.user_id == message.match_id, Match.matched_user_id == current_user.id)
+        ),
+        Match.is_match == True
+    ).first()
 
-    # Verify users are matched
-    match = db.query(User).filter(User.id == message_data.match_id).first()
-    if not match or match not in current_user.matches:
-        raise HTTPException(status_code=403, detail="Not matched with this user")
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
 
-    # Create conversation ID (sorted user IDs for consistency)
-    conversation_id = f"chat_{min(current_user.id, message_data.match_id)}_{max(current_user.id, message_data.match_id)}"
+    # Create conversation ID (sorted user IDs)
+    user_ids = sorted([current_user.id, message.match_id])
+    conversation_id = f"chat_{user_ids[0]}_{user_ids[1]}"
 
-    # Add message to Firestore
-    message_ref = firebase_db.collection('conversations').document(conversation_id).collection('messages').document()
-    message_ref.set({
-        'sender_id': current_user.id,
-        'sender_name': current_user.username,
-        'content': message_data.content,
-        'timestamp': firestore.SERVER_TIMESTAMP,
-        'read': False
-    })
+    # Store message in Firestore
+    try:
+        firestore_db = firestore.client()
 
-    # Update conversation metadata
-    firebase_db.collection('conversations').document(conversation_id).set({
-        'participants': [current_user.id, message_data.match_id],
-        'last_message': message_data.content,
-        'last_message_timestamp': firestore.SERVER_TIMESTAMP,
-        'last_sender_id': current_user.id
-    }, merge=True)
+        # Create or get conversation
+        conversation_ref = firestore_db.collection('conversations').document(conversation_id)
 
-    return {"status": "sent", "conversation_id": conversation_id}
+        # Add message to subcollection
+        message_data = {
+            'sender_id': current_user.id,
+            'sender_name': current_user.username,
+            'content': message.content,
+            'timestamp': firestore.SERVER_TIMESTAMP,
+            'read': False
+        }
+
+        messages_ref = conversation_ref.collection('messages')
+        messages_ref.add(message_data)
+
+        # Update conversation metadata
+        conversation_ref.set({
+            'participants': [current_user.id, message.match_id],
+            'last_message': message.content,
+            'last_message_time': firestore.SERVER_TIMESTAMP,
+            'last_sender_id': current_user.id
+        }, merge=True)
+
+        return {"message": "Message sent successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send message: {str(e)}")
 
 
 @app.get("/messages/{match_id}")
@@ -2054,6 +2067,39 @@ async def mark_matches_read(
     current_user.last_viewed_matches = datetime.utcnow()
     db.commit()
     return {"status": "success"}
+
+
+@app.post("/messages/{match_id}/mark-read")
+async def mark_messages_read(
+        match_id: int,
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """Mark all messages from a match as read"""
+    try:
+        # Create conversation ID
+        user_ids = sorted([current_user.id, match_id])
+        conversation_id = f"chat_{user_ids[0]}_{user_ids[1]}"
+
+        # Get Firestore reference
+        firestore_db = firestore.client()
+        messages_ref = firestore_db.collection('conversations').document(conversation_id).collection('messages')
+
+        # Query for unread messages from the other user
+        unread_messages = messages_ref.where('sender_id', '!=', current_user.id).where('read', '==', False).stream()
+
+        # Mark all as read
+        batch = firestore_db.batch()
+        count = 0
+        for msg in unread_messages:
+            batch.update(msg.reference, {'read': True})
+            count += 1
+
+        batch.commit()
+
+        return {"message": f"Marked {count} messages as read"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

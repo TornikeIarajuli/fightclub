@@ -1,7 +1,7 @@
-// pages/chat/[matchId].js
+// pages/chat/[matchId].js - COMPLETE FIX with auto mark-as-read
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, where, getDocs } from 'firebase/firestore';
 import { db } from '../../src/firebase';
 import Navigation from '../../components/Navigation';
 import { Send, ArrowLeft, Smile, X } from 'lucide-react';
@@ -19,13 +19,18 @@ export default function Messages() {
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
 
-  // Auto-scroll to bottom
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
+        behavior: "auto",
+        block: "end"
+      });
+    }
   };
 
   useEffect(() => {
-    scrollToBottom();
+    const timer = setTimeout(() => scrollToBottom(), 50);
+    return () => clearTimeout(timer);
   }, [messages]);
 
   // Fetch current user
@@ -70,6 +75,50 @@ export default function Messages() {
     fetchOtherUser();
   }, [matchId]);
 
+  // ✅ NEW: Mark all unread messages as read when entering chat
+  useEffect(() => {
+    if (!matchId || !currentUser) return;
+
+    const markMessagesAsRead = async () => {
+      try {
+        const currentUserId = currentUser.id;
+        const conversationId = `chat_${Math.min(currentUserId, parseInt(matchId))}_${Math.max(currentUserId, parseInt(matchId))}`;
+
+        const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+        const q = query(
+          messagesRef,
+          where('sender_id', '==', parseInt(matchId)),
+          where('read', '==', false)
+        );
+
+        const snapshot = await getDocs(q);
+
+        console.log(`Found ${snapshot.size} unread messages to mark as read`);
+
+        // Mark each message as read
+        const updatePromises = [];
+        snapshot.forEach((docSnapshot) => {
+          const docRef = doc(db, 'conversations', conversationId, 'messages', docSnapshot.id);
+          updatePromises.push(updateDoc(docRef, { read: true }));
+        });
+
+        await Promise.all(updatePromises);
+        console.log('All messages marked as read');
+      } catch (error) {
+        console.error('Error marking messages as read:', error);
+      }
+    };
+
+    // Mark messages as read when component mounts
+    markMessagesAsRead();
+
+    // Also mark as read when window gains focus (user comes back to tab)
+    const handleFocus = () => markMessagesAsRead();
+    window.addEventListener('focus', handleFocus);
+
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [matchId, currentUser]);
+
   // Real-time listener for messages
   useEffect(() => {
     if (!matchId || !currentUser) return;
@@ -91,6 +140,20 @@ export default function Messages() {
         });
       });
       setMessages(msgs);
+
+      // ✅ Mark new messages as read immediately when they arrive
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const data = change.doc.data();
+          // If it's a message from the other user and it's unread, mark it as read
+          if (data.sender_id !== currentUserId && data.read === false) {
+            const docRef = doc(db, 'conversations', conversationId, 'messages', change.doc.id);
+            updateDoc(docRef, { read: true }).catch(err =>
+              console.error('Error marking message as read:', err)
+            );
+          }
+        }
+      });
     }, (error) => {
       console.error('Error listening to messages:', error);
     });
@@ -145,9 +208,9 @@ export default function Messages() {
 
   if (!currentUser || !otherUser) {
     return (
-      <div className="min-h-screen bg-gray-900">
+      <div className="h-screen bg-gray-900 flex flex-col overflow-hidden">
         <Navigation />
-        <div className="flex items-center justify-center h-screen">
+        <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-red-500 border-t-transparent mb-4"></div>
             <p className="text-gray-400 text-xl">Loading chat...</p>
@@ -158,11 +221,11 @@ export default function Messages() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
+    <div className="h-screen bg-gray-900 flex flex-col overflow-hidden">
       <Navigation />
 
       {/* Chat Header */}
-      <div className="bg-gradient-to-r from-gray-800 to-gray-900 border-b border-red-500/20 shadow-xl sticky top-0 z-10">
+      <div className="bg-gradient-to-r from-gray-800 to-gray-900 border-b border-red-500/20 shadow-xl flex-shrink-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -215,7 +278,7 @@ export default function Messages() {
       >
         <div className="max-w-5xl mx-auto space-y-4">
           {messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center justify-center min-h-full">
               <div className="text-center py-16">
                 <div className="text-7xl mb-4">💬</div>
                 <p className="text-gray-400 text-lg">No messages yet</p>
@@ -231,7 +294,6 @@ export default function Messages() {
                   className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className={`flex items-end space-x-2 max-w-md ${isCurrentUser ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                    {/* Avatar */}
                     {!isCurrentUser && (
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-600 to-gray-700 flex items-center justify-center text-sm flex-shrink-0 mb-1 overflow-hidden">
                         {otherUser.profile_pic ? (
@@ -248,7 +310,6 @@ export default function Messages() {
                       </div>
                     )}
 
-                    {/* Message bubble */}
                     <div
                       className={`px-4 py-3 rounded-2xl shadow-lg ${
                         isCurrentUser
@@ -276,38 +337,43 @@ export default function Messages() {
       </div>
 
       {/* Message Input */}
-      <div className="bg-gradient-to-r from-gray-800 to-gray-900 border-t border-red-500/20 shadow-2xl sticky bottom-0">
-        <div className="max-w-5xl mx-auto px-4 py-4">
-          {/* Emoji Picker */}
+      <div className="bg-gradient-to-r from-gray-800 to-gray-900 border-t border-red-500/20 shadow-2xl flex-shrink-0">
+        <div className="max-w-5xl mx-auto px-4 py-4 relative">
           {showEmojiPicker && (
-            <div className="mb-4 flex justify-end">
-              <div className="relative">
-                <button
-                  onClick={() => setShowEmojiPicker(false)}
-                  className="absolute -top-2 -right-2 z-10 p-1 bg-red-600 hover:bg-red-700 rounded-full text-white"
-                >
-                  <X size={16} />
-                </button>
+            <div className="absolute bottom-full right-4 mb-2 z-50">
+              <button
+                onClick={() => setShowEmojiPicker(false)}
+                className="absolute -top-2 -right-2 z-10 p-1.5 bg-red-600 hover:bg-red-700 rounded-full text-white shadow-lg"
+              >
+                <X size={16} />
+              </button>
+              <div className="shadow-2xl rounded-2xl overflow-hidden border border-gray-700">
                 <EmojiPicker
                   onEmojiClick={onEmojiClick}
                   theme="dark"
-                  width={350}
-                  height={400}
+                  width={320}
+                  height={350}
+                  previewConfig={{ showPreview: false }}
+                  searchDisabled={false}
+                  skinTonesDisabled={false}
+                  emojiStyle="native"
                 />
               </div>
             </div>
           )}
 
           <div className="flex items-end space-x-3">
-            {/* Emoji Button */}
             <button
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="p-3 bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white rounded-2xl transition border border-gray-700"
+              className={`p-3 rounded-2xl transition border ${
+                showEmojiPicker
+                  ? 'bg-red-600 text-white border-red-500'
+                  : 'bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white border-gray-700'
+              }`}
             >
               <Smile size={24} />
             </button>
 
-            {/* Text Input */}
             <div className="flex-1 bg-gray-900 rounded-2xl border border-gray-700 focus-within:border-red-500 transition">
               <textarea
                 value={newMessage}
@@ -320,7 +386,6 @@ export default function Messages() {
               />
             </div>
 
-            {/* Send Button */}
             <button
               onClick={sendMessage}
               disabled={!newMessage.trim() || loading}

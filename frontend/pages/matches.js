@@ -1,10 +1,10 @@
-// pages/matches.js
+// pages/matches.js - FIXED VERSION
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Navigation from '../components/Navigation';
 import { MessageSquare, Trophy, Target, Bell } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
-import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../src/firebase';
 
 export default function Matches() {
@@ -16,6 +16,7 @@ export default function Matches() {
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState({});
   const [lastMessages, setLastMessages] = useState({});
+  const [currentUserId, setCurrentUserId] = useState(null);
   const [recordData, setRecordData] = useState({
     result: 'win',
     martialArtStyle: '',
@@ -54,8 +55,24 @@ export default function Matches() {
       return;
     }
 
+    fetchCurrentUser();
     fetchMatches();
   }, []);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch('https://fightmatch-backend.onrender.com/users/me', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentUserId(data.id);
+      }
+    } catch (error) {
+      console.error('Error fetching current user:', error);
+    }
+  };
 
   const fetchMatches = async () => {
     try {
@@ -99,9 +116,9 @@ export default function Matches() {
       // Create conversation ID
       const conversationId = `chat_${Math.min(currentUserId, matchId)}_${Math.max(currentUserId, matchId)}`;
 
-      // Listen to messages in this conversation
+      // ✅ FIXED: Count ALL unread messages, not just get last one
       const messagesRef = collection(db, 'conversations', conversationId, 'messages');
-      const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(1));
+      const q = query(messagesRef, orderBy('timestamp', 'desc'));
 
       const unsubscribe = onSnapshot(q, (snapshot) => {
         let unreadCount = 0;
@@ -109,13 +126,17 @@ export default function Matches() {
 
         snapshot.forEach((doc) => {
           const data = doc.data();
-          lastMsg = {
-            content: data.content,
-            timestamp: data.timestamp?.toDate(),
-            sender_id: data.sender_id
-          };
 
-          // Count unread messages (messages not sent by current user)
+          // Get the last message (first in desc order)
+          if (!lastMsg) {
+            lastMsg = {
+              content: data.content,
+              timestamp: data.timestamp?.toDate(),
+              sender_id: data.sender_id
+            };
+          }
+
+          // ✅ FIXED: Count ALL unread messages from other user
           if (data.sender_id !== currentUserId && !data.read) {
             unreadCount++;
           }
@@ -136,6 +157,49 @@ export default function Matches() {
     } catch (error) {
       console.error('Error setting up message listener:', error);
     }
+  };
+
+  // ✅ NEW: Mark messages as read when viewing chat
+  const handleViewChat = async (matchId) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const userResponse = await fetch('https://fightmatch-backend.onrender.com/users/me', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (userResponse.ok) {
+        const currentUser = await userResponse.json();
+        const currentUserId = currentUser.id;
+        const conversationId = `chat_${Math.min(currentUserId, matchId)}_${Math.max(currentUserId, matchId)}`;
+
+        // Mark all messages as read in Firestore
+        const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+        const q = query(messagesRef, where('sender_id', '!=', currentUserId), where('read', '==', false));
+
+        const snapshot = await getDocs(q);
+
+        // Use Firestore batch to update all unread messages
+        const { doc, updateDoc } = await import('firebase/firestore');
+        const updates = [];
+        snapshot.forEach((docSnap) => {
+          const docRef = doc(db, 'conversations', conversationId, 'messages', docSnap.id);
+          updates.push(updateDoc(docRef, { read: true }));
+        });
+
+        await Promise.all(updates);
+
+        // ✅ Clear the unread count immediately
+        setUnreadMessages(prev => ({
+          ...prev,
+          [matchId]: 0
+        }));
+      }
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+    }
+
+    // Navigate to chat
+    router.push(`/chat/${matchId}`);
   };
 
   const handleRecordFight = (match) => {
@@ -231,6 +295,7 @@ export default function Matches() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {matches.map((match) => {
               const hasUnread = unreadMessages[match.id] > 0;
+              const unreadCount = unreadMessages[match.id] || 0;
               const lastMsg = lastMessages[match.id];
 
               return (
@@ -242,11 +307,11 @@ export default function Matches() {
                       : 'border-red-500/20 hover:border-red-500/50'
                   }`}
                 >
-                  {/* Unread Badge */}
+                  {/* ✅ FIXED: Show actual unread count */}
                   {hasUnread && (
                     <div className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 animate-pulse shadow-lg">
                       <Bell size={12} />
-                      {unreadMessages[match.id]} new
+                      {unreadCount} new
                     </div>
                   )}
 
@@ -321,10 +386,10 @@ export default function Matches() {
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
+                  {/* ✅ FIXED: Action Buttons - Call handleViewChat instead of direct push */}
                   <div className="flex gap-3">
                     <button
-                      onClick={() => router.push(`/chat/${match.id}`)}
+                      onClick={() => handleViewChat(match.id)}
                       className={`flex-1 flex items-center justify-center gap-2 font-semibold py-3 rounded-lg transition-all relative ${
                         hasUnread
                           ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/30'
@@ -335,7 +400,7 @@ export default function Matches() {
                       Message
                       {hasUnread && (
                         <span className="absolute -top-1 -right-1 bg-yellow-500 text-gray-900 text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                          {unreadMessages[match.id]}
+                          {unreadCount}
                         </span>
                       )}
                     </button>
