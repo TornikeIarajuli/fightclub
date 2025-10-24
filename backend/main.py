@@ -1717,57 +1717,43 @@ class MessageCreate(BaseModel):
 
 @app.post("/messages/send")
 async def send_message(
-        message: MessageCreate,
+        message_data: MessageCreate,
         current_user: User = Depends(get_current_user),
         db: Session = Depends(get_db)
 ):
-    """Send a message to a matched user"""
-    # Verify the match exists
-    match = db.query(Match).filter(
-        or_(
-            and_(Match.user_id == current_user.id, Match.matched_user_id == message.match_id),
-            and_(Match.user_id == message.match_id, Match.matched_user_id == current_user.id)
-        ),
-        Match.is_match == True
-    ).first()
+    """Send a real-time message via Firebase"""
+
+    # Verify users are matched - FIX THIS PART
+    match = db.query(User).filter(User.id == message_data.match_id).first()
 
     if not match:
-        raise HTTPException(status_code=404, detail="Match not found")
+        raise HTTPException(status_code=404, detail="User not found")
 
-    # Create conversation ID (sorted user IDs)
-    user_ids = sorted([current_user.id, message.match_id])
-    conversation_id = f"chat_{user_ids[0]}_{user_ids[1]}"
+    if match not in current_user.matches:
+        raise HTTPException(status_code=403, detail="Not matched with this user")
 
-    # Store message in Firestore
-    try:
-        firestore_db = firestore.client()
+    # Create conversation ID (sorted user IDs for consistency)
+    conversation_id = f"chat_{min(current_user.id, message_data.match_id)}_{max(current_user.id, message_data.match_id)}"
 
-        # Create or get conversation
-        conversation_ref = firestore_db.collection('conversations').document(conversation_id)
+    # Add message to Firestore
+    message_ref = firebase_db.collection('conversations').document(conversation_id).collection('messages').document()
+    message_ref.set({
+        'sender_id': current_user.id,
+        'sender_name': current_user.username,
+        'content': message_data.content,
+        'timestamp': firestore.SERVER_TIMESTAMP,
+        'read': False
+    })
 
-        # Add message to subcollection
-        message_data = {
-            'sender_id': current_user.id,
-            'sender_name': current_user.username,
-            'content': message.content,
-            'timestamp': firestore.SERVER_TIMESTAMP,
-            'read': False
-        }
+    # Update conversation metadata
+    firebase_db.collection('conversations').document(conversation_id).set({
+        'participants': [current_user.id, message_data.match_id],
+        'last_message': message_data.content,
+        'last_message_timestamp': firestore.SERVER_TIMESTAMP,
+        'last_sender_id': current_user.id
+    }, merge=True)
 
-        messages_ref = conversation_ref.collection('messages')
-        messages_ref.add(message_data)
-
-        # Update conversation metadata
-        conversation_ref.set({
-            'participants': [current_user.id, message.match_id],
-            'last_message': message.content,
-            'last_message_time': firestore.SERVER_TIMESTAMP,
-            'last_sender_id': current_user.id
-        }, merge=True)
-
-        return {"message": "Message sent successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to send message: {str(e)}")
+    return {"status": "sent", "conversation_id": conversation_id}
 
 
 @app.get("/messages/{match_id}")
