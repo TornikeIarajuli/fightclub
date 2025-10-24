@@ -1,45 +1,21 @@
 from sqlalchemy import create_engine, text
+import os
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./fight_match.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fight_match.db")
+engine = create_engine(DATABASE_URL)
 
-
-def migrate_database():
-    """Add new columns for advanced filtering"""
-
+def add_missing_columns():
     with engine.connect() as conn:
         try:
-            # Add gender column
-            conn.execute(text("ALTER TABLE users ADD COLUMN gender VARCHAR"))
-            print("✓ Added gender column")
+            # Add last_viewed_matches column
+            conn.execute(text("""
+                ALTER TABLE users 
+                ADD COLUMN last_viewed_matches DATETIME
+            """))
+            conn.commit()
+            print("✅ Added last_viewed_matches column")
         except Exception as e:
-            print(f"Gender column might already exist: {e}")
-
-        try:
-            # Add latitude column
-            conn.execute(text("ALTER TABLE users ADD COLUMN latitude FLOAT"))
-            print("✓ Added latitude column")
-        except Exception as e:
-            print(f"Latitude column might already exist: {e}")
-
-        try:
-            # Add longitude column
-            conn.execute(text("ALTER TABLE users ADD COLUMN longitude FLOAT"))
-            print("✓ Added longitude column")
-        except Exception as e:
-            print(f"Longitude column might already exist: {e}")
-
-        try:
-            # Add availability column (JSON)
-            conn.execute(text("ALTER TABLE users ADD COLUMN availability JSON"))
-            print("✓ Added availability column")
-        except Exception as e:
-            print(f"Availability column might already exist: {e}")
-
-        conn.commit()
-        print("\n✅ Migration completed!")
-
+            print(f"Column might already exist or error: {e}")
 
 if __name__ == "__main__":
-    print("Starting database migration...")
-    migrate_database()
+    add_missing_columns()
