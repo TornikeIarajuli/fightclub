@@ -130,13 +130,18 @@ class User(Base):
     gender = Column(String, nullable=True)  # Male, Female, Other, Prefer not to say
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
-    # availability is stored as JSON: {"monday": ["09:00-12:00", "18:00-21:00"], "tuesday": [...]}
     availability = Column(JSON, nullable=True)
     last_viewed_matches = Column(DateTime, nullable=True)
+    current_title = Column(String, nullable=True)
+    total_achievement_points = Column(Integer, default=0)
 
     # Matching preferences
     preferred_distance = Column(Integer, default=50)  # km
     preferred_skill_range = Column(String, default="all")
+    titles = relationship("UserTitle", back_populates="user", cascade="all, delete-orphan")
+    badges = relationship("UserBadge", back_populates="user", cascade="all, delete-orphan")
+    achievement_notifications = relationship("AchievementNotification", back_populates="user",
+                                             cascade="all, delete-orphan")
 
 
     # Relationships
@@ -301,11 +306,11 @@ class UserTitle(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    title_id = Column(String)  # e.g., "bronze_fighter", "champion"
+    title = Column(String)
     unlocked_at = Column(DateTime, default=datetime.utcnow)
-    is_active = Column(Boolean, default=False)  # Currently displayed title
+    is_active = Column(Boolean, default=False)
 
-    user = relationship("User", back_populates="titles")
+    user = relationship("User", back_populates="titles")  # Changed from backref
 
 
 class UserBadge(Base):
@@ -313,11 +318,13 @@ class UserBadge(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    badge_id = Column(String)  # e.g., "first_win", "knockout_king"
+    badge_id = Column(String)
+    badge_name = Column(String)
+    badge_icon = Column(String)
     unlocked_at = Column(DateTime, default=datetime.utcnow)
-    is_displayed = Column(Boolean, default=False)  # Show on profile
+    is_displayed = Column(Boolean, default=False)
 
-    user = relationship("User", back_populates="badges")
+    user = relationship("User", back_populates="badges")  # Changed from backref
 
 
 class AchievementNotification(Base):
@@ -325,23 +332,15 @@ class AchievementNotification(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
+    achievement_type = Column(String)
     achievement_id = Column(String)
     title = Column(String)
-    message = Column(String)
+    description = Column(String)
     points_earned = Column(Integer)
     is_read = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    user = relationship("User", back_populates="achievement_notifications")
-
-
-# Update User model to add relationships
-# Add these to the User class:
-# titles = relationship("UserTitle", back_populates="user")
-# badges = relationship("UserBadge", back_populates="user")
-# achievement_notifications = relationship("AchievementNotification", back_populates="user")
-# current_title = Column(String, nullable=True)
-# displayed_badges = Column(JSON, nullable=True)  # Array of badge IDs
+    user = relationship("User", back_populates="achievement_notifications")  # Changed from backref
 
 
 # Pydantic models
