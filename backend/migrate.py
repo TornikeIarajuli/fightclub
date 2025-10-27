@@ -1,21 +1,30 @@
-from sqlalchemy import create_engine, text
-import os
+# backend/migrate_db.py
+from sqlalchemy import text
+from main import engine, Base, UserTitle, UserBadge, AchievementNotification
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fight_match.db")
-engine = create_engine(DATABASE_URL)
 
-def add_missing_columns():
+def migrate():
+    print("Running database migrations...")
+
     with engine.connect() as conn:
         try:
-            # Add last_viewed_matches column
+            # Add columns to users table
+            print("Adding columns to users table...")
             conn.execute(text("""
                 ALTER TABLE users 
-                ADD COLUMN last_viewed_matches DATETIME
+                ADD COLUMN IF NOT EXISTS current_title VARCHAR,
+                ADD COLUMN IF NOT EXISTS total_achievement_points INTEGER DEFAULT 0;
             """))
             conn.commit()
-            print("✅ Added last_viewed_matches column")
+            print("✅ User table updated")
         except Exception as e:
-            print(f"Column might already exist or error: {e}")
+            print(f"Note: {e}")
+
+    # Create new tables
+    print("Creating achievement tables...")
+    Base.metadata.create_all(bind=engine)
+    print("✅ Migration complete!")
+
 
 if __name__ == "__main__":
-    add_missing_columns()
+    migrate()
