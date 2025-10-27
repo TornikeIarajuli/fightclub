@@ -43,9 +43,23 @@ firebase_admin.initialize_app(cred, {
 firebase_db = firestore.client()
 firebase_bucket = storage.bucket()
 
+import os
+from sqlalchemy import create_engine
+
 # Database setup
-SQLALCHEMY_DATABASE_URL = "sqlite:///./fight_match.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fight_match.db")
+
+# Fix for Render's postgres:// vs postgresql:// URL format
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# Remove connect_args for PostgreSQL compatibility
+if DATABASE_URL.startswith("postgresql://"):
+    engine = create_engine(DATABASE_URL)
+else:
+    # SQLite needs check_same_thread=False
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
