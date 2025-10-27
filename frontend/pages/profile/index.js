@@ -4,11 +4,17 @@ import { useRouter } from 'next/router';
 import Navigation from '../../components/Navigation';
 import PhotoGalleryManager from '../../components/PhotoGalleryManager';
 import { Edit, MapPin, Calendar, Award, TrendingUp, Shield, Plus } from 'lucide-react';
+import ProfileBadges from '../../components/ProfileBadges';
+import BadgeSelector from '../../components/BadgeSelector';
+import TitleBadge from '../../components/TitleBadge';
 
 export default function Profile() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const [badges, setBadges] = useState([]);
+  const [currentTitle, setCurrentTitle] = useState(null);
+  const [showBadgeSelector, setShowBadgeSelector] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -43,6 +49,37 @@ export default function Profile() {
       setLoading(false);
     }
   };
+
+  const fetchBadgesAndTitle = async () => {
+  try {
+    const token = localStorage.getItem('access_token');
+
+    // Fetch badges
+    const badgesResponse = await fetch('https://fightmatch-backend.onrender.com/badges/available', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (badgesResponse.ok) {
+      const badgesData = await badgesResponse.json();
+      setBadges(badgesData.badges);
+    }
+
+    // Fetch achievements to get title
+    const achievementsResponse = await fetch('https://fightmatch-backend.onrender.com/achievements/detailed', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (achievementsResponse.ok) {
+      const achievementsData = await achievementsResponse.json();
+      setCurrentTitle(achievementsData.current_title);
+    }
+  } catch (error) {
+    console.error('Error fetching badges and title:', error);
+  }
+};
+
+useEffect(() => {
+  fetchProfile();
+  fetchBadgesAndTitle();
+}, []);
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
@@ -180,6 +217,21 @@ export default function Profile() {
                   <p className="text-gray-400 text-lg">@{user.username}</p>
                 </div>
 
+                {currentTitle && (
+                  <div className="mb-4">
+                    <TitleBadge title={currentTitle} size="md" />
+                  </div>
+                )}
+
+                <BadgeSelector
+                  isOpen={showBadgeSelector}
+                  onClose={() => setShowBadgeSelector(false)}
+                  onSave={() => {
+                    fetchBadgesAndTitle();
+                    setShowBadgeSelector(false);
+                  }}
+                />
+
                 {/* Quick Stats */}
                 <div className="space-y-3 mb-6">
                   <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-xl">
@@ -234,6 +286,11 @@ export default function Profile() {
                     <p className="text-3xl font-bold text-green-400">{getWinRate()}%</p>
                   </div>
                 </div>
+                <ProfileBadges
+                  badges={badges}
+                  isOwner={true}
+                  onManage={() => setShowBadgeSelector(true)}
+                />
 
                 <div className="grid grid-cols-3 gap-4">
                   <div className="bg-gradient-to-br from-green-500/10 to-green-600/10 border border-green-500/30 rounded-2xl p-6 text-center">

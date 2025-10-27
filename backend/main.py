@@ -296,6 +296,90 @@ class TokenData(BaseModel):
     username: Optional[str] = None
 
 
+class UserTitle(Base):
+    __tablename__ = "user_titles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    title_id = Column(String)  # e.g., "bronze_fighter", "champion"
+    unlocked_at = Column(DateTime, default=datetime.utcnow)
+    is_active = Column(Boolean, default=False)  # Currently displayed title
+
+    user = relationship("User", back_populates="titles")
+
+
+class UserBadge(Base):
+    __tablename__ = "user_badges"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    badge_id = Column(String)  # e.g., "first_win", "knockout_king"
+    unlocked_at = Column(DateTime, default=datetime.utcnow)
+    is_displayed = Column(Boolean, default=False)  # Show on profile
+
+    user = relationship("User", back_populates="badges")
+
+
+class AchievementNotification(Base):
+    __tablename__ = "achievement_notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    achievement_id = Column(String)
+    title = Column(String)
+    message = Column(String)
+    points_earned = Column(Integer)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="achievement_notifications")
+
+
+# Update User model to add relationships
+# Add these to the User class:
+# titles = relationship("UserTitle", back_populates="user")
+# badges = relationship("UserBadge", back_populates="user")
+# achievement_notifications = relationship("AchievementNotification", back_populates="user")
+# current_title = Column(String, nullable=True)
+# displayed_badges = Column(JSON, nullable=True)  # Array of badge IDs
+
+
+# Pydantic models
+class TitleResponse(BaseModel):
+    id: str
+    name: str
+    description: str
+    icon: str
+    unlocked: bool
+    requirements: dict
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BadgeResponse(BaseModel):
+    id: str
+    name: str
+    description: str
+    icon: str
+    color: str
+    unlocked: bool
+    is_displayed: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AchievementNotificationResponse(BaseModel):
+    id: int
+    achievement_id: str
+    title: str
+    message: str
+    points_earned: int
+    is_read: bool
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # Create tables TODO
 # Base.metadata.drop_all(bind=engine)
 Base.metadata.create_all(bind=engine)
@@ -371,6 +455,644 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 
+ACHIEVEMENTS_CONFIG = {
+    # Beginner
+    "first_match": {
+        "name": "First Match",
+        "description": "Complete your first sparring session",
+        "icon": "🥊",
+        "category": "Beginner",
+        "points": 10,
+        "badge_id": "first_match_badge",
+        "check": lambda stats: stats["total_fights"] >= 1
+    },
+    "first_win": {
+        "name": "First Victory",
+        "description": "Win your first match",
+        "icon": "🏆",
+        "category": "Beginner",
+        "points": 15,
+        "badge_id": "first_win_badge",
+        "check": lambda stats: stats["wins"] >= 1
+    },
+    "dedicated": {
+        "name": "Dedicated Fighter",
+        "description": "Train for 7 consecutive days",
+        "icon": "🔥",
+        "category": "Beginner",
+        "points": 20,
+        "badge_id": "dedicated_badge",
+        "check": lambda stats: stats["training_streak"] >= 7
+    },
+
+    # Intermediate
+    "warrior": {
+        "name": "Warrior",
+        "description": "Complete 25 matches",
+        "icon": "⚔️",
+        "category": "Intermediate",
+        "points": 30,
+        "badge_id": "warrior_badge",
+        "check": lambda stats: stats["total_fights"] >= 25
+    },
+    "hot_streak": {
+        "name": "Hot Streak",
+        "description": "Win 5 matches in a row",
+        "icon": "⚡",
+        "category": "Intermediate",
+        "points": 25,
+        "badge_id": "hot_streak_badge",
+        "check": lambda stats: stats["current_streak"] >= 5
+    },
+    "style_master": {
+        "name": "Style Master",
+        "description": "Train in 5 different martial arts",
+        "icon": "🎯",
+        "category": "Intermediate",
+        "points": 35,
+        "badge_id": "style_master_badge",
+        "check": lambda stats: stats["styles_trained"] >= 5
+    },
+    "social_butterfly": {
+        "name": "Social Butterfly",
+        "description": "Match with 10 fighters",
+        "icon": "🦋",
+        "category": "Intermediate",
+        "points": 20,
+        "badge_id": "social_badge",
+        "check": lambda stats: stats.get("total_matches", 0) >= 10
+    },
+
+    # Advanced
+    "centurion": {
+        "name": "Centurion",
+        "description": "Complete 100 matches",
+        "icon": "💯",
+        "category": "Advanced",
+        "points": 50,
+        "badge_id": "centurion_badge",
+        "check": lambda stats: stats["total_fights"] >= 100
+    },
+    "unstoppable": {
+        "name": "Unstoppable",
+        "description": "Win 10 matches in a row",
+        "icon": "👑",
+        "category": "Advanced",
+        "points": 40,
+        "badge_id": "unstoppable_badge",
+        "check": lambda stats: stats["longest_streak"] >= 10
+    },
+    "champion": {
+        "name": "Champion",
+        "description": "Maintain 80% win rate with 50+ fights",
+        "icon": "🥇",
+        "category": "Advanced",
+        "points": 60,
+        "badge_id": "champion_badge",
+        "check": lambda stats: stats["win_rate"] >= 80 and stats["total_fights"] >= 50
+    },
+    "knockout_artist": {
+        "name": "Knockout Artist",
+        "description": "Win 20 matches",
+        "icon": "💥",
+        "category": "Advanced",
+        "points": 35,
+        "badge_id": "knockout_badge",
+        "check": lambda stats: stats["wins"] >= 20
+    },
+
+    # Elite
+    "legend": {
+        "name": "Legend",
+        "description": "Complete 500 matches",
+        "icon": "🌟",
+        "category": "Elite",
+        "points": 100,
+        "badge_id": "legend_badge",
+        "check": lambda stats: stats["total_fights"] >= 500
+    },
+    "grand_master": {
+        "name": "Grand Master",
+        "description": "Train in 10 different martial arts",
+        "icon": "🎖️",
+        "category": "Elite",
+        "points": 75,
+        "badge_id": "grand_master_badge",
+        "check": lambda stats: stats["styles_trained"] >= 10
+    },
+    "immortal": {
+        "name": "Immortal",
+        "description": "Win 25 matches in a row",
+        "icon": "👹",
+        "category": "Elite",
+        "points": 150,
+        "badge_id": "immortal_badge",
+        "check": lambda stats: stats["longest_streak"] >= 25
+    },
+    "iron_wall": {
+        "name": "Iron Wall",
+        "description": "Train for 30 consecutive days",
+        "icon": "🛡️",
+        "category": "Elite",
+        "points": 100,
+        "badge_id": "iron_wall_badge",
+        "check": lambda stats: stats["training_streak"] >= 30
+    },
+    "sensei": {
+        "name": "Sensei",
+        "description": "Match with 50 fighters",
+        "icon": "🧘",
+        "category": "Elite",
+        "points": 50,
+        "badge_id": "sensei_badge",
+        "check": lambda stats: stats.get("total_matches", 0) >= 50
+    },
+}
+
+# Title ranks based on total points
+TITLES_CONFIG = {
+    "novice": {
+        "name": "Novice Fighter",
+        "description": "Just starting your journey",
+        "icon": "🥋",
+        "color": "gray",
+        "points_required": 0
+    },
+    "bronze_fighter": {
+        "name": "Bronze Fighter",
+        "description": "Building your foundation",
+        "icon": "🥉",
+        "color": "orange",
+        "points_required": 50
+    },
+    "silver_fighter": {
+        "name": "Silver Fighter",
+        "description": "Showing real progress",
+        "icon": "🥈",
+        "color": "gray",
+        "points_required": 150
+    },
+    "gold_fighter": {
+        "name": "Gold Fighter",
+        "description": "A formidable opponent",
+        "icon": "🥇",
+        "color": "yellow",
+        "points_required": 300
+    },
+    "platinum_fighter": {
+        "name": "Platinum Fighter",
+        "description": "Elite level warrior",
+        "icon": "💎",
+        "color": "cyan",
+        "points_required": 500
+    },
+    "master": {
+        "name": "Master",
+        "description": "Reached the pinnacle",
+        "icon": "⚡",
+        "color": "purple",
+        "points_required": 750
+    },
+    "grandmaster": {
+        "name": "Grandmaster",
+        "description": "Legendary status achieved",
+        "icon": "👑",
+        "color": "red",
+        "points_required": 1000
+    }
+}
+
+
+# Helper function to check achievements and award badges
+def check_and_award_achievements(user_id: int, db: Session):
+    """Check user stats and award new achievements"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return []
+
+    # Get user stats
+    stats = get_user_stats_dict(user_id, db)
+
+    # Get already unlocked achievements
+    unlocked_badges = db.query(UserBadge).filter(
+        UserBadge.user_id == user_id
+    ).all()
+    unlocked_badge_ids = {badge.badge_id for badge in unlocked_badges}
+
+    newly_unlocked = []
+
+    # Check each achievement
+    for achievement_id, achievement in ACHIEVEMENTS_CONFIG.items():
+        badge_id = achievement.get("badge_id")
+
+        # Skip if already unlocked
+        if badge_id in unlocked_badge_ids:
+            continue
+
+        # Check if requirement is met
+        try:
+            if achievement["check"](stats):
+                # Award badge
+                new_badge = UserBadge(
+                    user_id=user_id,
+                    badge_id=badge_id,
+                    is_displayed=len(unlocked_badge_ids) < 3  # Auto-display first 3 badges
+                )
+                db.add(new_badge)
+
+                # Create notification
+                notification = AchievementNotification(
+                    user_id=user_id,
+                    achievement_id=achievement_id,
+                    title=f"🎉 {achievement['name']} Unlocked!",
+                    message=achievement['description'],
+                    points_earned=achievement['points']
+                )
+                db.add(notification)
+
+                newly_unlocked.append({
+                    "achievement_id": achievement_id,
+                    "name": achievement["name"],
+                    "points": achievement["points"],
+                    "badge_id": badge_id
+                })
+
+                unlocked_badge_ids.add(badge_id)
+        except Exception as e:
+            print(f"Error checking achievement {achievement_id}: {e}")
+
+    # Check and update title
+    total_points = sum(a["points"] for a in ACHIEVEMENTS_CONFIG.values()
+                       if ACHIEVEMENTS_CONFIG[a]["badge_id"] in unlocked_badge_ids)
+
+    current_title = get_title_for_points(total_points)
+    if user.current_title != current_title:
+        user.current_title = current_title
+
+        # Create title notification
+        title_info = TITLES_CONFIG[current_title]
+        notification = AchievementNotification(
+            user_id=user_id,
+            achievement_id=f"title_{current_title}",
+            title=f"🎖️ New Title: {title_info['name']}!",
+            message=title_info['description'],
+            points_earned=0
+        )
+        db.add(notification)
+
+    db.commit()
+    return newly_unlocked
+
+
+def get_title_for_points(points: int) -> str:
+    """Get appropriate title based on total points"""
+    for title_id in reversed(list(TITLES_CONFIG.keys())):
+        if points >= TITLES_CONFIG[title_id]["points_required"]:
+            return title_id
+    return "novice"
+
+
+def get_user_stats_dict(user_id: int, db: Session) -> dict:
+    """Get all user stats needed for achievement checking"""
+    user = db.query(User).filter(User.id == user_id).first()
+
+    # Get martial arts count
+    if isinstance(user.martial_arts, list):
+        martial_arts = user.martial_arts
+    elif isinstance(user.martial_arts, str):
+        try:
+            martial_arts = json.loads(user.martial_arts)
+        except:
+            martial_arts = []
+    else:
+        martial_arts = []
+
+    # Calculate streaks
+    fights = db.query(FightRecord).filter(
+        (FightRecord.user_id == user.id) | (FightRecord.opponent_id == user.id)
+    ).order_by(FightRecord.date.desc()).all()
+
+    current_streak = 0
+    longest_streak = 0
+    temp_streak = 0
+
+    for fight in fights:
+        is_winner = (fight.user_id == user.id and fight.result == "win") or \
+                    (fight.opponent_id == user.id and fight.result == "loss")
+
+        if is_winner:
+            temp_streak += 1
+            longest_streak = max(longest_streak, temp_streak)
+        else:
+            temp_streak = 0
+
+    # Current streak
+    for fight in fights:
+        is_winner = (fight.user_id == user.id and fight.result == "win") or \
+                    (fight.opponent_id == user.id and fight.result == "loss")
+        if is_winner:
+            current_streak += 1
+        else:
+            break
+
+    # Training streak
+    training_days = set()
+    for fight in fights:
+        training_days.add(fight.date.date())
+
+    training_streak = 0
+    check_date = datetime.utcnow().date()
+    while check_date in training_days:
+        training_streak += 1
+        check_date -= timedelta(days=1)
+
+    total_fights = user.wins + user.losses + user.draws
+    win_rate = (user.wins / total_fights * 100) if total_fights > 0 else 0
+
+    # Get match count
+    total_matches = len(user.matches)
+
+    return {
+        "total_fights": total_fights,
+        "wins": user.wins,
+        "losses": user.losses,
+        "draws": user.draws,
+        "win_rate": win_rate,
+        "current_streak": current_streak,
+        "longest_streak": longest_streak,
+        "styles_trained": len(martial_arts),
+        "training_streak": training_streak,
+        "total_matches": total_matches
+    }
+
+
+@app.get("/achievements/detailed")
+def get_detailed_achievements(
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """Get achievements with unlock status and progress"""
+    stats = get_user_stats_dict(current_user.id, db)
+
+    # Get unlocked badges
+    unlocked_badges = db.query(UserBadge).filter(
+        UserBadge.user_id == current_user.id
+    ).all()
+    unlocked_badge_ids = {badge.badge_id for badge in unlocked_badges}
+
+    # Calculate total points
+    total_points = sum(
+        achievement["points"]
+        for achievement in ACHIEVEMENTS_CONFIG.values()
+        if achievement.get("badge_id") in unlocked_badge_ids
+    )
+
+    # Get current title
+    current_title_id = get_title_for_points(total_points)
+    current_title = TITLES_CONFIG[current_title_id]
+
+    # Next title
+    next_title_id = None
+    for title_id in TITLES_CONFIG.keys():
+        if TITLES_CONFIG[title_id]["points_required"] > total_points:
+            next_title_id = title_id
+            break
+
+    # Build achievements list
+    achievements = []
+    for achievement_id, achievement in ACHIEVEMENTS_CONFIG.items():
+        badge_id = achievement.get("badge_id")
+        unlocked = badge_id in unlocked_badge_ids
+
+        # Calculate progress
+        progress = 0
+        required = 0
+
+        try:
+            if achievement_id == "first_match" or achievement_id == "first_win":
+                required = 1
+                progress = min(stats[achievement_id.split("_")[1] if achievement_id == "first_win" else "total_fights"],
+                               1)
+            elif achievement_id == "dedicated" or achievement_id == "iron_wall":
+                required = 7 if achievement_id == "dedicated" else 30
+                progress = min(stats["training_streak"], required)
+            elif achievement_id == "warrior" or achievement_id == "centurion" or achievement_id == "legend":
+                required = {"warrior": 25, "centurion": 100, "legend": 500}[achievement_id]
+                progress = min(stats["total_fights"], required)
+            elif "streak" in achievement_id:
+                required = {"hot_streak": 5, "unstoppable": 10, "immortal": 25}[achievement_id]
+                progress = min(stats["longest_streak"], required)
+            elif "style" in achievement_id:
+                required = {"style_master": 5, "grand_master": 10}[achievement_id]
+                progress = min(stats["styles_trained"], required)
+            elif achievement_id == "champion":
+                required = 50
+                progress = min(stats["total_fights"] if stats["win_rate"] >= 80 else 0, required)
+            elif achievement_id == "knockout_artist":
+                required = 20
+                progress = min(stats["wins"], required)
+            elif "social" in achievement_id or "sensei" in achievement_id:
+                required = {"social_butterfly": 10, "sensei": 50}[achievement_id]
+                progress = min(stats["total_matches"], required)
+        except:
+            pass
+
+        achievements.append({
+            "id": achievement_id,
+            "name": achievement["name"],
+            "description": achievement["description"],
+            "icon": achievement["icon"],
+            "category": achievement["category"],
+            "points": achievement["points"],
+            "badge_id": badge_id,
+            "unlocked": unlocked,
+            "progress": progress,
+            "required": required
+        })
+
+    return {
+        "achievements": achievements,
+        "total_points": total_points,
+        "max_points": sum(a["points"] for a in ACHIEVEMENTS_CONFIG.values()),
+        "current_title": {
+            "id": current_title_id,
+            **current_title
+        },
+        "next_title": {
+            "id": next_title_id,
+            **TITLES_CONFIG[next_title_id]
+        } if next_title_id else None,
+        "stats": stats
+    }
+
+
+@app.get("/badges/available")
+def get_available_badges(
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """Get all badges and their unlock status"""
+    unlocked_badges = db.query(UserBadge).filter(
+        UserBadge.user_id == current_user.id
+    ).all()
+
+    badge_dict = {badge.badge_id: badge for badge in unlocked_badges}
+
+    badges = []
+    for achievement_id, achievement in ACHIEVEMENTS_CONFIG.items():
+        badge_id = achievement.get("badge_id")
+        user_badge = badge_dict.get(badge_id)
+
+        badges.append({
+            "id": badge_id,
+            "name": achievement["name"],
+            "description": achievement["description"],
+            "icon": achievement["icon"],
+            "color": get_color_for_category(achievement["category"]),
+            "category": achievement["category"],
+            "unlocked": user_badge is not None,
+            "is_displayed": user_badge.is_displayed if user_badge else False,
+            "unlocked_at": user_badge.unlocked_at.isoformat() if user_badge else None
+        })
+
+    return {"badges": badges}
+
+
+def get_color_for_category(category: str) -> str:
+    """Get color for badge category"""
+    colors = {
+        "Beginner": "green",
+        "Intermediate": "blue",
+        "Advanced": "purple",
+        "Elite": "red"
+    }
+    return colors.get(category, "gray")
+
+
+@app.put("/badges/display")
+def update_displayed_badges(
+        badge_ids: List[str],
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """Update which badges are displayed on profile (max 3)"""
+    if len(badge_ids) > 3:
+        raise HTTPException(status_code=400, detail="Maximum 3 badges can be displayed")
+
+    # Reset all badges
+    db.query(UserBadge).filter(
+        UserBadge.user_id == current_user.id
+    ).update({"is_displayed": False})
+
+    # Set selected badges
+    for badge_id in badge_ids:
+        db.query(UserBadge).filter(
+            UserBadge.user_id == current_user.id,
+            UserBadge.badge_id == badge_id
+        ).update({"is_displayed": True})
+
+    db.commit()
+
+    return {"message": "Badges updated successfully"}
+
+
+@app.get("/notifications/achievements")
+def get_achievement_notifications(
+        unread_only: bool = False,
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """Get achievement notifications"""
+    query = db.query(AchievementNotification).filter(
+        AchievementNotification.user_id == current_user.id
+    )
+
+    if unread_only:
+        query = query.filter(AchievementNotification.is_read == False)
+
+    notifications = query.order_by(
+        AchievementNotification.created_at.desc()
+    ).limit(50).all()
+
+    return {"notifications": notifications}
+
+
+@app.post("/notifications/achievements/mark-read")
+def mark_notifications_read(
+        notification_ids: List[int] = None,
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """Mark achievement notifications as read"""
+    query = db.query(AchievementNotification).filter(
+        AchievementNotification.user_id == current_user.id
+    )
+
+    if notification_ids:
+        query = query.filter(AchievementNotification.id.in_(notification_ids))
+
+    query.update({"is_read": True})
+    db.commit()
+
+    return {"message": "Notifications marked as read"}
+
+
+# Update the fight record endpoint to check achievements
+@app.post("/fights/record")
+def record_fight(
+        fight_data: FightRecordCreate,
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """Record a fight result and check for new achievements"""
+
+    if fight_data.result not in ["win", "loss", "draw"]:
+        raise HTTPException(status_code=400, detail="Invalid result")
+
+    # Create fight record
+    fight_record = FightRecord(
+        user_id=current_user.id,
+        opponent_id=fight_data.opponent_id,
+        result=fight_data.result,
+        martial_art_style=fight_data.martial_art_style,
+        notes=fight_data.notes if fight_data.notes else None
+    )
+    db.add(fight_record)
+
+    # Update user stats
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if fight_data.result == "win":
+        user.wins += 1
+    elif fight_data.result == "loss":
+        user.losses += 1
+    else:
+        user.draws += 1
+
+    # Update opponent stats
+    opponent = db.query(User).filter(User.id == fight_data.opponent_id).first()
+    if opponent:
+        if fight_data.result == "win":
+            opponent.losses += 1
+        elif fight_data.result == "loss":
+            opponent.wins += 1
+        else:
+            opponent.draws += 1
+
+    db.commit()
+
+    # Check for new achievements
+    newly_unlocked = check_and_award_achievements(current_user.id, db)
+
+    return {
+        "message": "Fight recorded successfully",
+        "fight_id": fight_record.id,
+        "user_stats": {
+            "wins": user.wins,
+            "losses": user.losses,
+            "draws": user.draws
+        },
+        "newly_unlocked": newly_unlocked
+    }
 # Routes
 @app.get("/")
 def read_root():

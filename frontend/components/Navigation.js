@@ -1,41 +1,12 @@
-// components/Navigation.js
+// components/Navigation.js - ENHANCED WITH ACHIEVEMENT NOTIFICATIONS
 import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
-import { Home, Users, MessageSquare, User, LogOut, BarChart3, Trophy, Settings } from 'lucide-react';
+import { Home, Users, MessageSquare, User, LogOut, BarChart3, Trophy, Settings, Bell } from 'lucide-react';
+import { useNotifications } from '../context/NotificationContext';
 
 export default function Navigation() {
   const router = useRouter();
-  const [matchCount, setMatchCount] = useState(0);
-
-  // Fetch match count
-  useEffect(() => {
-    const fetchMatches = async () => {
-      try {
-        const token = localStorage.getItem('access_token');
-        if (!token) return;
-
-        const response = await fetch('https://fightmatch-backend.onrender.com/matches', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (response.ok) {
-          const matches = await response.json();
-          setMatchCount(matches.length);
-        }
-      } catch (error) {
-        console.error('Error fetching matches:', error);
-      }
-    };
-
-    fetchMatches();
-
-    // Refresh count every 30 seconds
-    const interval = setInterval(fetchMatches, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
+  const { unreadMatches, unreadAchievements } = useNotifications();
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -44,9 +15,15 @@ export default function Navigation() {
 
   const navItems = [
     { name: 'Discover', path: '/discover', icon: Users },
-    { name: 'Matches', path: '/matches', icon: MessageSquare, badge: matchCount },
+    { name: 'Matches', path: '/matches', icon: MessageSquare, badge: unreadMatches },
     { name: 'Analytics', path: '/analytics', icon: BarChart3 },
-    { name: 'Achievements', path: '/achievements', icon: Trophy },
+    {
+      name: 'Achievements',
+      path: '/achievements',
+      icon: Trophy,
+      badge: unreadAchievements,
+      badgeColor: 'bg-yellow-500' // Different color for achievements
+    },
     { name: 'Profile', path: '/profile', icon: User },
     { name: 'Settings', path: '/settings', icon: Settings },
   ];
@@ -71,6 +48,7 @@ export default function Navigation() {
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = router.pathname === item.path;
+              const badgeColor = item.badgeColor || 'bg-red-500';
 
               return (
                 <button
@@ -86,7 +64,7 @@ export default function Navigation() {
                     <Icon size={20} />
                     {/* Notification Badge */}
                     {item.badge > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 animate-pulse">
+                      <span className={`absolute -top-2 -right-2 ${badgeColor} text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 animate-pulse shadow-lg`}>
                         {item.badge > 99 ? '99+' : item.badge}
                       </span>
                     )}
