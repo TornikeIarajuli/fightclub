@@ -1,4 +1,4 @@
-// pages/index.js
+// pages/index.js - FIXED VERSION (no style jsx)
 import { useRouter } from 'next/router';
 import { Swords } from 'lucide-react';
 
@@ -10,14 +10,14 @@ export default function Home() {
       {/* Animated background shapes */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-20 left-20 w-96 h-96 bg-red-500/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-20 w-96 h-96 bg-red-600/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute bottom-20 right-20 w-96 h-96 bg-red-600/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
 
       {/* Main content */}
       <div className="relative z-10 text-center px-6 max-w-4xl">
         {/* Logo */}
         <div className="mb-8 flex justify-center">
-          <div className="bg-gradient-to-br from-red-600 to-red-800 p-6 rounded-2xl shadow-2xl shadow-red-500/50 animate-float">
+          <div className="bg-gradient-to-br from-red-600 to-red-800 p-6 rounded-2xl shadow-2xl shadow-red-500/50 animate-bounce">
             <Swords className="w-20 h-20 text-white" />
           </div>
         </div>
@@ -72,25 +72,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes float {
-          0%, 100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-20px);
-          }
-        }
-
-        .animate-float {
-          animation: float 3s ease-in-out infinite;
-        }
-
-        .delay-1000 {
-          animation-delay: 1s;
-        }
-      `}</style>
     </div>
   );
 }

@@ -35,6 +35,9 @@ export default function Login() {
       if (response.ok) {
         // Store token
         localStorage.setItem('access_token', data.access_token);
+        await router.push('/discover').catch(() => {
+            window.location.href = '/discover';
+        });
         
         // ✅ NEW: Fetch user data and store user_id
         try {
