@@ -1,6 +1,7 @@
-// pages/login.js
+// pages/login.js - FIXED ROUTING VERSION
 import { useState } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 
 export default function Login() {
   const [formData, setFormData] = useState({
@@ -35,11 +36,8 @@ export default function Login() {
       if (response.ok) {
         // Store token
         localStorage.setItem('access_token', data.access_token);
-        await router.push('/discover').catch(() => {
-            window.location.href = '/discover';
-        });
-        
-        // ✅ NEW: Fetch user data and store user_id
+
+        // Fetch user data and store user_id
         try {
           const userResponse = await fetch('https://fightmatch-backend.onrender.com/users/me', {
             headers: {
@@ -55,11 +53,10 @@ export default function Login() {
           }
         } catch (err) {
           console.error('Error fetching user data:', err);
-          // Don't block login if this fails
         }
 
-        // Redirect to discover page
-        router.push('/discover');
+        // Use router.replace to prevent back navigation to login
+        await router.replace('/discover');
       } else {
         setError(data.detail || 'Login failed');
       }
@@ -136,12 +133,12 @@ export default function Login() {
         <div className="mt-6 text-center">
           <p className="text-gray-400 text-sm">
             Don't have an account?{' '}
-            <button
-              onClick={() => router.push('/register')}
+            <Link
+              href="/register"
               className="text-red-500 hover:text-red-400 font-semibold"
             >
               Sign up
-            </button>
+            </Link>
           </p>
         </div>
       </div>

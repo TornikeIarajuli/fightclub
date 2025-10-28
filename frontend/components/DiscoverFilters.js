@@ -1,4 +1,4 @@
-// components/DiscoverFilters.js
+// components/DiscoverFilters.js - FIXED VERSION
 import { useState, useEffect } from 'react';
 import { Filter, X, MapPin, Award, Users, Calendar, Target } from 'lucide-react';
 
@@ -25,10 +25,10 @@ export default function DiscoverFilters({ onApplyFilters, onClose }) {
   useEffect(() => {
     fetchFilterOptions();
   }, []);
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://fightmatch-backend.onrender.com';
+
   const fetchFilterOptions = async () => {
     try {
-      const response = await fetch('${API_URL}/filters/options');
+      const response = await fetch('https://fightmatch-backend.onrender.com/filters/options');
       if (response.ok) {
         const data = await response.json();
         setFilterOptions(data);

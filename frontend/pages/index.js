@@ -1,5 +1,6 @@
-// pages/index.js - FIXED VERSION (no style jsx)
+// pages/index.js - FIXED VERSION
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import { Swords } from 'lucide-react';
 
 export default function Home() {
@@ -34,21 +35,21 @@ export default function Home() {
 
         {/* Buttons */}
         <div className="flex gap-6 justify-center flex-wrap">
-          <button
-            onClick={() => router.push('/login')}
+          <Link
+            href="/login"
             className="group relative px-12 py-4 bg-red-600 hover:bg-red-700 text-white font-bold text-lg rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg shadow-red-500/50 hover:shadow-red-500/80"
           >
             <span className="relative z-10">Login</span>
             <div className="absolute inset-0 bg-gradient-to-r from-red-700 to-red-600 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          </button>
+          </Link>
 
-          <button
-            onClick={() => router.push('/register')}
+          <Link
+            href="/register"
             className="group relative px-12 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-500/50 hover:shadow-blue-500/80"
           >
             <span className="relative z-10">Register</span>
             <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-blue-600 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          </button>
+          </Link>
         </div>
 
         {/* Features */}
