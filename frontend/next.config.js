@@ -1,10 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',  // ✅ This is what enables static export
+  // Removed static export for proper client-side routing
   images: {
     unoptimized: true,
   },
-  trailingSlash: true,
 }
 
 module.exports = nextConfig
