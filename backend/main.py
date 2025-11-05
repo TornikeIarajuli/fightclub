@@ -1,30 +1,23 @@
 # main.py
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, ForeignKey, Table, DateTime, JSON
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import sessionmaker, Session, relationship
-from typing import List
-from passlib.context import CryptContext
-import jwt
-from jwt import PyJWTError
-from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, ForeignKey, Table, DateTime, Text
-from pydantic import BaseModel, EmailStr, ConfigDict
-from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File
-from fastapi.staticfiles import StaticFiles
-from pathlib import Path
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, JSON
-from datetime import datetime, timedelta
-from collections import defaultdict
-from sqlalchemy import func, Boolean
-import firebase_admin
-from firebase_admin import credentials, firestore, storage
-import uuid
-from sqlalchemy.orm import Session
-
-
 import os
 import json
+import uuid
+import jwt
+from typing import List
+from datetime import datetime, timedelta
+from collections import defaultdict
+from pathlib import Path
+from jwt import PyJWTError
+from passlib.context import CryptContext
+from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, EmailStr, ConfigDict
+from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, ForeignKey, Table, DateTime, JSON, Text, func
+from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
+import firebase_admin
+from firebase_admin import credentials, firestore, storage
 
 # Initialize Firebase
 # Check if running in production (environment variable exists)
@@ -42,9 +35,6 @@ firebase_admin.initialize_app(cred, {
 
 firebase_db = firestore.client()
 firebase_bucket = storage.bucket()
-
-import os
-from sqlalchemy import create_engine
 
 # Database setup
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fight_match.db")
@@ -1719,69 +1709,6 @@ def get_profile_stats(current_user: User = Depends(get_current_user), db: Sessio
     }
 
 
-@app.post("/fights/record")
-def record_fight(
-        fight_data: FightRecordCreate,  # Use the Pydantic model here
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
-):
-    """Record a fight result"""
-
-    # Add logging to see what we received
-    print(f"Received fight data: {fight_data}")
-    print(f"opponent_id: {fight_data.opponent_id}")
-    print(f"result: {fight_data.result}")
-    print(f"martial_art_style: {fight_data.martial_art_style}")
-    print(f"notes: {fight_data.notes}")
-
-    if fight_data.result not in ["win", "loss", "draw"]:
-        raise HTTPException(status_code=400, detail="Invalid result. Must be 'win', 'loss', or 'draw'")
-
-    # Create fight record
-    fight_record = FightRecord(
-        user_id=current_user.id,
-        opponent_id=fight_data.opponent_id,
-        result=fight_data.result,
-        martial_art_style=fight_data.martial_art_style,
-        notes=fight_data.notes if fight_data.notes else None
-    )
-
-    db.add(fight_record)
-
-    # Update user stats
-    user = db.query(User).filter(User.id == current_user.id).first()
-
-    if fight_data.result == "win":
-        user.wins += 1
-    elif fight_data.result == "loss":
-        user.losses += 1
-    else:
-        user.draws += 1
-
-    # Update opponent stats (opposite result)
-    opponent = db.query(User).filter(User.id == fight_data.opponent_id).first()
-
-    if opponent:
-        if fight_data.result == "win":
-            opponent.losses += 1
-        elif fight_data.result == "loss":
-            opponent.wins += 1
-        else:
-            opponent.draws += 1
-
-    db.commit()
-    db.refresh(fight_record)
-
-    return {
-        "message": "Fight recorded successfully",
-        "fight_id": fight_record.id,
-        "user_stats": {
-            "wins": user.wins,
-            "losses": user.losses,
-            "draws": user.draws
-        }
-    }
-
 # Get fight history
 @app.get("/fights/history")
 def get_fight_history(
@@ -2280,171 +2207,6 @@ async def get_user_gallery(
     return photos
 
 
-@app.get("/analytics")
-def get_analytics(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Get detailed analytics for the current user"""
-
-    user = db.query(User).filter(User.id == current_user.id).first()
-
-    # Calculate win/loss streaks
-    fights = db.query(FightRecord).filter(
-        (FightRecord.user_id == user.id) | (FightRecord.opponent_id == user.id)
-    ).order_by(FightRecord.date.desc()).all()
-
-    current_streak = 0
-    longest_streak = 0
-    temp_streak = 0
-
-    for fight in fights:
-        is_winner = (fight.user_id == user.id and fight.result == "win") or \
-                    (fight.opponent_id == user.id and fight.result == "loss")
-
-        if is_winner:
-            temp_streak += 1
-            longest_streak = max(longest_streak, temp_streak)
-        else:
-            temp_streak = 0
-
-    # Current streak is the most recent
-    for fight in fights:
-        is_winner = (fight.user_id == user.id and fight.result == "win") or \
-                    (fight.opponent_id == user.id and fight.result == "loss")
-
-        if is_winner:
-            current_streak += 1
-        else:
-            break
-
-    # Calculate stats by martial art style
-    style_stats = defaultdict(lambda: {"wins": 0, "losses": 0, "draws": 0})
-
-    for fight in fights:
-        if fight.martial_art_style:
-            style = fight.martial_art_style
-            is_user = fight.user_id == user.id
-
-            if fight.result == "win" and is_user:
-                style_stats[style]["wins"] += 1
-            elif fight.result == "loss" and is_user:
-                style_stats[style]["losses"] += 1
-            elif fight.result == "draw":
-                style_stats[style]["draws"] += 1
-
-    # Monthly activity (last 6 months)
-    six_months_ago = datetime.utcnow() - timedelta(days=180)
-    monthly_fights = defaultdict(int)
-
-    for fight in fights:
-        if fight.date >= six_months_ago:
-            month_key = fight.date.strftime("%Y-%m")
-            monthly_fights[month_key] += 1
-
-    # Calculate training frequency
-    training_days = set()
-    for fight in fights:
-        training_days.add(fight.date.date())
-
-    training_streak = 0
-    check_date = datetime.utcnow().date()
-
-    while check_date in training_days:
-        training_streak += 1
-        check_date -= timedelta(days=1)
-
-    total_fights = user.wins + user.losses + user.draws
-    win_rate = (user.wins / total_fights * 100) if total_fights > 0 else 0
-
-    return {
-        "total_fights": total_fights,
-        "wins": user.wins,
-        "losses": user.losses,
-        "draws": user.draws,
-        "win_rate": round(win_rate, 1),
-        "current_streak": current_streak,
-        "longest_streak": longest_streak,
-        "style_stats": dict(style_stats),
-        "monthly_activity": dict(monthly_fights),
-        "training_streak": training_streak,
-        "unique_training_days": len(training_days)
-    }
-
-
-@app.get("/profile/stats")
-def get_profile_stats(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Get user stats for achievements"""
-
-    user = db.query(User).filter(User.id == current_user.id).first()
-
-    # Get martial arts from user profile - handle both list and string
-    if isinstance(user.martial_arts, list):
-        martial_arts = user.martial_arts
-    elif isinstance(user.martial_arts, str):
-        try:
-            martial_arts = json.loads(user.martial_arts)
-        except:
-            martial_arts = []
-    else:
-        martial_arts = []
-
-    styles_trained = len(martial_arts)
-
-    # Calculate streaks
-    fights = db.query(FightRecord).filter(
-        (FightRecord.user_id == user.id) | (FightRecord.opponent_id == user.id)
-    ).order_by(FightRecord.date.desc()).all()
-
-    current_streak = 0
-    longest_streak = 0
-    temp_streak = 0
-
-    for fight in fights:
-        is_winner = (fight.user_id == user.id and fight.result == "win") or \
-                    (fight.opponent_id == user.id and fight.result == "loss")
-
-        if is_winner:
-            temp_streak += 1
-            longest_streak = max(longest_streak, temp_streak)
-        else:
-            temp_streak = 0
-
-    # Calculate current streak
-    for fight in fights:
-        is_winner = (fight.user_id == user.id and fight.result == "win") or \
-                    (fight.opponent_id == user.id and fight.result == "loss")
-
-        if is_winner:
-            current_streak += 1
-        else:
-            break
-
-    # Calculate training streak (consecutive days)
-    training_days = set()
-    for fight in fights:
-        training_days.add(fight.date.date())
-
-    training_streak = 0
-    check_date = datetime.utcnow().date()
-
-    while check_date in training_days:
-        training_streak += 1
-        check_date -= timedelta(days=1)
-
-    total_fights = user.wins + user.losses + user.draws
-    win_rate = (user.wins / total_fights * 100) if total_fights > 0 else 0
-
-    return {
-        "total_fights": total_fights,
-        "wins": user.wins,
-        "losses": user.losses,
-        "draws": user.draws,
-        "win_rate": round(win_rate, 1),
-        "current_streak": current_streak,
-        "longest_streak": longest_streak,
-        "styles_trained": styles_trained,
-        "training_streak": training_streak
-    }
-
-
 class MessageCreate(BaseModel):
     match_id: int
     content: str
@@ -2550,149 +2312,6 @@ async def get_conversations(
         })
 
     return conv_list
-
-
-
-
-# Endpoint to record a fight
-@app.post("/fights/record")
-def record_fight(
-        opponent_id: int,
-        result: str,
-        martial_art_style: str,
-        notes: str = None,
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
-):
-    """Record a fight result"""
-
-    if result not in ["win", "loss", "draw"]:
-        raise HTTPException(status_code=400, detail="Invalid result. Must be 'win', 'loss', or 'draw'")
-
-    # Create fight record
-    fight_record = FightRecord(
-        user_id=current_user.id,
-        opponent_id=opponent_id,
-        result=result,
-        martial_art_style=martial_art_style,
-        notes=notes
-    )
-
-    db.add(fight_record)
-
-    # Update user stats
-    user = db.query(User).filter(User.id == current_user.id).first()
-
-    if result == "win":
-        user.wins += 1
-    elif result == "loss":
-        user.losses += 1
-    else:
-        user.draws += 1
-
-    # Update opponent stats (opposite result)
-    opponent = db.query(User).filter(User.id == opponent_id).first()
-
-    if opponent:
-        if result == "win":
-            opponent.losses += 1
-        elif result == "loss":
-            opponent.wins += 1
-        else:
-            opponent.draws += 1
-
-    db.commit()
-
-    return {"message": "Fight recorded successfully", "fight_id": fight_record.id}
-
-
-# Get fight history
-@app.get("/fights/history")
-def get_fight_history(
-        limit: int = 20,
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
-):
-    """Get user's fight history"""
-
-    fights = db.query(FightRecord).filter(
-        (FightRecord.user_id == current_user.id) | (FightRecord.opponent_id == current_user.id)
-    ).order_by(FightRecord.date.desc()).limit(limit).all()
-
-    fight_history = []
-
-    for fight in fights:
-        is_user = fight.user_id == current_user.id
-        opponent_id = fight.opponent_id if is_user else fight.user_id
-        opponent = db.query(User).filter(User.id == opponent_id).first()
-
-        fight_history.append({
-            "id": fight.id,
-            "opponent_name": opponent.username if opponent else "Unknown",
-            "opponent_id": opponent_id,
-            "result": fight.result if is_user else (
-                "loss" if fight.result == "win" else "win" if fight.result == "loss" else "draw"),
-            "martial_art_style": fight.martial_art_style,
-            "date": fight.date.isoformat(),
-            "notes": fight.notes
-        })
-
-    return fight_history
-
-
-# Get leaderboard
-@app.get("/leaderboard")
-def get_leaderboard(
-        style: str = None,
-        limit: int = 10,
-        db: Session = Depends(get_db)
-):
-    """Get top fighters leaderboard"""
-
-    users = db.query(User).all()
-
-    leaderboard = []
-
-    for user in users:
-        total_fights = user.wins + user.losses + user.draws
-
-        if total_fights < 5:  # Minimum fights to qualify
-            continue
-
-        win_rate = (user.wins / total_fights * 100) if total_fights > 0 else 0
-
-        # Filter by style if specified
-        if style:
-            # Handle both list and string types
-            if isinstance(user.martial_arts, list):
-                martial_arts = user.martial_arts
-            elif isinstance(user.martial_arts, str):
-                try:
-                    martial_arts = json.loads(user.martial_arts)
-                except:
-                    martial_arts = []
-            else:
-                martial_arts = []
-
-            if style not in martial_arts:
-                continue
-
-        leaderboard.append({
-            "user_id": user.id,
-            "username": user.username,
-            "wins": user.wins,
-            "losses": user.losses,
-            "draws": user.draws,
-            "total_fights": total_fights,
-            "win_rate": round(win_rate, 1),
-            "skill_level": user.skill_level
-        })
-
-    # Sort by win rate, then total wins
-    leaderboard.sort(key=lambda x: (x["win_rate"], x["wins"]), reverse=True)
-
-    return leaderboard[:limit]
-
 
 
 # Delete photo from gallery
