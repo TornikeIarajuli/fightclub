@@ -1,0 +1,87 @@
+// components/Navigation.js - FIXED ROUTING VERSION
+import { useRouter } from 'next/router';
+import { useState, useEffect } from 'react';
+import { Home, Users, MessageSquare, User, LogOut, BarChart3, Trophy, Settings, Bell } from 'lucide-react';
+import { useNotifications } from '../context/NotificationContext';
+import Link from 'next/link';
+
+export default function Navigation() {
+  const router = useRouter();
+  const { unreadMatches, unreadAchievements } = useNotifications();
+
+  const handleLogout = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('username');
+    router.push('/login');
+  };
+
+  const navItems = [
+    { name: 'Discover', path: '/discover', icon: Users },
+    { name: 'Matches', path: '/matches', icon: MessageSquare, badge: unreadMatches },
+    { name: 'Analytics', path: '/analytics', icon: BarChart3 },
+    {
+      name: 'Achievements',
+      path: '/achievements',
+      icon: Trophy,
+      badge: unreadAchievements,
+      badgeColor: 'bg-yellow-500'
+    },
+    { name: 'Profile', path: '/profile', icon: User },
+    { name: 'Settings', path: '/settings', icon: Settings },
+  ];
+
+  return (
+    <nav className="bg-gray-800 border-b border-red-500/20 sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="flex items-center justify-between h-16">
+          {/* Logo - Fixed Link usage without <a> tag for Next.js 13+ */}
+          <Link href="/discover" className="flex items-center space-x-2 cursor-pointer group">
+            <div className="text-2xl">⚔️</div>
+            <span className="text-xl font-bold text-white group-hover:text-red-500 transition">
+              FightMatch
+            </span>
+          </Link>
+
+          {/* Navigation Links - Fixed Link components */}
+          <div className="flex items-center space-x-1">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = router.pathname === item.path;
+
+              return (
+                <Link
+                  key={item.path}
+                  href={item.path}
+                  className={`relative flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 cursor-pointer ${
+                    isActive
+                      ? 'bg-red-600 text-white'
+                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                  }`}
+                >
+                  <Icon size={20} />
+                  <span className="hidden md:inline font-medium">{item.name}</span>
+                  {/* Badge */}
+                  {item.badge > 0 && (
+                    <span className={`absolute -top-1 -right-1 ${item.badgeColor || 'bg-red-500'} text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center`}>
+                      {item.badge}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+
+            {/* Logout button */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center space-x-2 px-4 py-2 rounded-lg text-gray-300 hover:bg-red-600 hover:text-white transition-all duration-200 ml-2"
+            >
+              <LogOut size={20} />
+              <span className="hidden md:inline font-medium">Logout</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+}
