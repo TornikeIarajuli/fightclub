@@ -379,11 +379,6 @@ useEffect(() => {
                   </div>
                 </div>
               </div>
-
-              {/* Photo Gallery */}
-              <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl p-8 border border-red-500/20 shadow-xl">
-                <PhotoGalleryManager userId={user.id} isOwner={true} />
-              </div>
             </div>
           </div>
         )}

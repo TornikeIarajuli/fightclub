@@ -16,7 +16,7 @@ export default function MessageThread() {
 
   const getConversationId = (user1Id, user2Id) => {
     const ids = [parseInt(user1Id), parseInt(user2Id)].sort((a, b) => a - b);
-    return `conversation_${ids[0]}_${ids[1]}`;
+    return `chat_${ids[0]}_${ids[1]}`;
   };
 
   useEffect(() => {
@@ -57,9 +57,12 @@ export default function MessageThread() {
     const token = localStorage.getItem('access_token');
     try {
       // Changed from /stats/${userId} to /users/${userId}
-      const response = await fetch('https://fightmatch-backend.onrender.com/users/${userId}', {
+      const response = await fetch(`https://fightmatch-backend.onrender.com/users/${userId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      if (!response.ok) {
+        throw new Error('Failed to fetch user');
+      }
       const data = await response.json();
       setOtherUser(data);
     } catch (error) {
