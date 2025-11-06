@@ -4,5 +4,7 @@ backend/uploads
 *.pem
 *.key
 .env
+.env.local
+.env*.local
 .next/
 .DS_Store
