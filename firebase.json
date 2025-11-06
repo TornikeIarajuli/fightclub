@@ -7,60 +7,6 @@
       "**/node_modules/**"
     ],
     "cleanUrls": true,
-    "trailingSlash": false,
-    "rewrites": [
-      {
-        "source": "/discover",
-        "destination": "/discover/index.html"
-      },
-      {
-        "source": "/matches",
-        "destination": "/matches/index.html"
-      },
-      {
-        "source": "/profile",
-        "destination": "/profile/index.html"
-      },
-      {
-        "source": "/profile/edit",
-        "destination": "/profile/edit/index.html"
-      },
-      {
-        "source": "/profile/update-record",
-        "destination": "/profile/update-record/index.html"
-      },
-      {
-        "source": "/analytics",
-        "destination": "/analytics/index.html"
-      },
-      {
-        "source": "/achievements",
-        "destination": "/achievements/index.html"
-      },
-      {
-        "source": "/settings",
-        "destination": "/settings/index.html"
-      },
-      {
-        "source": "/login",
-        "destination": "/login/index.html"
-      },
-      {
-        "source": "/register",
-        "destination": "/register/index.html"
-      },
-      {
-        "source": "/chat/**",
-        "destination": "/chat/[matchId]/index.html"
-      },
-      {
-        "source": "/messages/**",
-        "destination": "/messages/[userId]/index.html"
-      },
-      {
-        "source": "/profile/view/**",
-        "destination": "/profile/view/[userId]/index.html"
-      }
-    ]
+    "trailingSlash": false
   }
 }
